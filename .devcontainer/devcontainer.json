@@ -1,7 +1,5 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
-// https://github.com/microsoft/vscode-dev-containers/tree/v0.222.0/containers/python-3-miniconda
 {
-    "name": "Python Environment",
+    "name": "NetBox PDU Plugin",
     "build": {
         "dockerfile": "Dockerfile",
         "context": ".."
@@ -10,35 +8,20 @@
         "vscode": {
             "extensions": [
                 "editorconfig.editorconfig",
-                "github.vscode-pull-request-github",
-                "ms-azuretools.vscode-docker",
                 "ms-python.python",
                 "ms-python.vscode-pylance",
-                "ms-python.pylint",
-                "ms-python.isort",
-                "ms-python.flake8",
-                "ms-python.black-formatter",
-                "ms-vsliveshare.vsliveshare",
-                "ryanluker.vscode-coverage-gutters",
+                "charliermarsh.ruff",
                 "bungcip.better-toml",
-                "GitHub.copilot"
+                "github.vscode-pull-request-github"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
-                "black-formatter.path": [
-                    "/usr/local/py-utils/bin/black"
-                ],
-                "pylint.path": [
-                    "/usr/local/py-utils/bin/pylint"
-                ],
-                "flake8.path": [
-                    "/usr/local/py-utils/bin/flake8"
-                ],
-                "isort.path": [
-                    "/usr/local/py-utils/bin/isort"
-                ]
+                "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+                "[python]": {
+                    "editor.defaultFormatter": "charliermarsh.ruff",
+                    "editor.formatOnSave": true
+                }
             }
         }
     },
-    "onCreateCommand": "pre-commit install-hooks"
+    "postCreateCommand": "uv sync && uvx pre-commit install --hook-type pre-push"
 }

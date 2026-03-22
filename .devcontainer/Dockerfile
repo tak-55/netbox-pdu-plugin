@@ -1,12 +1,11 @@
-FROM mcr.microsoft.com/devcontainers/python:3
+FROM mcr.microsoft.com/devcontainers/python:3.12
 
-RUN python -m pip install --upgrade pip \
-    && python -m pip install 'flit>=3.8.0'
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-ENV FLIT_ROOT_INSTALL=1
+# Install Node.js for Claude Code
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+    && apt-get install -y nodejs
 
-COPY pyproject.toml .
-RUN touch README.md \
-    && mkdir -p src/python_package \
-    && python -m flit install --only-deps --deps develop \
-    && rm -r pyproject.toml README.md src
+# Install Claude Code globally
+RUN npm install -g @anthropic-ai/claude-code
