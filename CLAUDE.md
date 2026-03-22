@@ -6,27 +6,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Lint
-make lint                  # ruff check only
+make lint                  # uvx ruff check only
 make ci                    # lint + Docker integration tests (mirrors CI)
 
 # Integration tests (requires netbox-docker running at ../netbox-docker)
-docker compose -f ../netbox-docker/docker-compose.yml \
-  -f ../netbox-docker/docker-compose.override.yml \
-  exec netbox python manage.py test netbox_pdu_plugin.tests -v 2
+DC="docker compose -f ../netbox-docker/docker-compose.yml -f ../netbox-docker/docker-compose.override.yml"
+$DC exec netbox python manage.py test netbox_pdu_plugin.tests -v 2
 
 # Run a single test class
-docker compose ... exec netbox python manage.py test netbox_pdu_plugin.tests.test_models.ManagedPDUModelTest -v 2
+$DC exec netbox python manage.py test netbox_pdu_plugin.tests.test_models.ManagedPDUModelTest -v 2
 
 # Unit tests only (no NetBox/DB required)
 uvx pytest netbox_pdu_plugin/tests/test_backends_raritan.py
 uvx pytest netbox_pdu_plugin/tests/test_backends_unifi.py
 
 # After code changes
-docker compose ... exec netbox python manage.py migrate
-docker compose ... restart netbox netbox-worker
+$DC exec netbox python manage.py migrate
+$DC restart netbox netbox-worker
 
 # Generate migrations (model changes)
-docker compose ... exec -e DEVELOPER=True netbox python manage.py makemigrations netbox_pdu_plugin
+$DC exec -e DEVELOPER=True netbox python manage.py makemigrations netbox_pdu_plugin
 ```
 
 ## Architecture
@@ -88,7 +87,7 @@ Strawberry/strawberry-django. Covers all three main models. `enums.py` mirrors `
 - **`api_password`** is stored as plaintext — never expose it in API responses or logs
 - **`PDUNetworkInterface`** is replaced entirely (delete + recreate) on each sync, not updated in place
 - **pre-push hook**: `uvx pre-commit install --hook-type pre-push` (runs lint + Docker tests before every push)
-- **UniFi power cycle**: `UniFiPDUClient.set_outlet_power_state('cycle')` calls `time.sleep(3)` internally to wait for the PDU to complete the cycle before re-reading state. This blocks the web worker thread for 3 seconds — known limitation, do not remove the sleep.
+- **UniFi power cycle**: contains `time.sleep(3)` — known blocking limitation, do not remove
 
 ## Testing
 
