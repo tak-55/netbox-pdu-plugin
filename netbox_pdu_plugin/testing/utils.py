@@ -110,7 +110,7 @@ def post_data(data: dict[str, Any]) -> dict[str, Any]:
             post_dict[key] = value.pk
 
         # Handle lists (many-to-many or multi-select)
-        elif isinstance(value, (list, tuple)):
+        elif isinstance(value, list | tuple):
             post_dict[key] = [
                 obj.pk if hasattr(obj, 'pk') else obj
                 for obj in value

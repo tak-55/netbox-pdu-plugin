@@ -111,7 +111,7 @@ class RaritanPDUClient(BasePDUClient):
         reset_epoch = None
         try:
             reset_result = self._rpc(sensor_rid, 'getLastResetTime')
-            if isinstance(reset_result, (int, float)):
+            if isinstance(reset_result, int | float):
                 reset_epoch = reset_result
             elif isinstance(reset_result, dict):
                 reset_epoch = reset_result.get('seconds') or reset_result.get('value')

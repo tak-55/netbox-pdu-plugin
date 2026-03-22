@@ -363,7 +363,7 @@ class PluginViewTestCase(PluginModelTestCase):
                 post_data[key] = value.pk
 
             # Handle lists (many-to-many)
-            elif isinstance(value, (list, tuple)):
+            elif isinstance(value, list | tuple):
                 post_data[key] = [
                     obj.pk if hasattr(obj, 'pk') else obj
                     for obj in value
