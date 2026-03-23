@@ -842,5 +842,159 @@ class TestGetOutletPowerStateEdgeCases(unittest.TestCase):
         self.assertEqual(result, "on")
 
 
+SAMPLE_PROMETHEUS = """\
+# HELP raritan_pdu_activeenergy_watthour_total Total activeenergy consumed in watthour
+# TYPE raritan_pdu_activeenergy_watthour_total counter
+raritan_pdu_activeenergy_watthour_total{pduid="1", pduname="My PDU", inletid="I1", inletname="Main"} 30857906.58
+raritan_pdu_activeenergy_watthour_total{pduid="1", pduname="My PDU", outletid="1", outletname="Server01"} 553051.00
+raritan_pdu_activeenergy_watthour_total{pduid="1", pduname="My PDU", outletid="2", outletname=""} 896839.58
+# HELP raritan_pdu_activepower_watt The current value of the activepower in watt
+# TYPE raritan_pdu_activepower_watt gauge
+raritan_pdu_activepower_watt{pduid="1", pduname="My PDU", inletid="I1", inletname="Main"} 124.49
+raritan_pdu_activepower_watt{pduid="1", pduname="My PDU", outletid="1", outletname="Server01"} 0.00
+raritan_pdu_activepower_watt{pduid="1", pduname="My PDU", outletid="2", outletname=""} 124.49
+# HELP raritan_pdu_current_ampere The current value of the current in ampere
+# TYPE raritan_pdu_current_ampere gauge
+raritan_pdu_current_ampere{pduid="1", pduname="My PDU", inletid="I1", inletname="Main"} 0.64
+raritan_pdu_current_ampere{pduid="1", pduname="My PDU", overcurrentprotectorid="C1", overcurrentprotectorname=""} 0.64
+raritan_pdu_current_ampere{pduid="1", pduname="My PDU", overcurrentprotectorid="C1", overcurrentprotectorname="", poleline="L1"} 0.64
+raritan_pdu_current_ampere{pduid="1", pduname="My PDU", outletid="1", outletname="Server01"} 0.00
+raritan_pdu_current_ampere{pduid="1", pduname="My PDU", outletid="2", outletname=""} 0.64
+# HELP raritan_pdu_voltage_volt The current value of the voltage in volt
+# TYPE raritan_pdu_voltage_volt gauge
+raritan_pdu_voltage_volt{pduid="1", pduname="My PDU", inletid="I1", inletname="Main"} 199.71
+raritan_pdu_voltage_volt{pduid="1", pduname="My PDU", outletid="1", outletname="Server01"} 199.71
+raritan_pdu_voltage_volt{pduid="1", pduname="My PDU", outletid="2", outletname=""} 199.71
+# HELP raritan_pdu_powerfactor The current value of the powerfactor
+# TYPE raritan_pdu_powerfactor gauge
+raritan_pdu_powerfactor{pduid="1", pduname="My PDU", inletid="I1", inletname="Main"} 0.97
+raritan_pdu_powerfactor{pduid="1", pduname="My PDU", outletid="1", outletname="Server01"} 1.00
+raritan_pdu_powerfactor{pduid="1", pduname="My PDU", outletid="2", outletname=""} 0.97
+# HELP raritan_pdu_linefrequency_hertz The current value of the linefrequency in hertz
+# TYPE raritan_pdu_linefrequency_hertz gauge
+raritan_pdu_linefrequency_hertz{pduid="1", pduname="My PDU", inletid="I1", inletname="Main"} 50.0
+# HELP raritan_pdu_apparentpower_voltampere The current value of the apparentpower in voltampere
+# TYPE raritan_pdu_apparentpower_voltampere gauge
+raritan_pdu_apparentpower_voltampere{pduid="1", pduname="My PDU", inletid="I1", inletname="Main"} 128.44
+"""
+
+
+class TestParsePrometheusText(unittest.TestCase):
+    """Tests for _parse_prometheus_text()."""
+
+    def setUp(self):
+        self.client = _make_client()
+
+    def test_outlet_count(self):
+        """Parses correct number of outlets."""
+        result = self.client._parse_prometheus_text(SAMPLE_PROMETHEUS)
+        self.assertEqual(len(result["outlets"]), 2)
+
+    def test_outlet_metrics(self):
+        """Outlet metrics are parsed correctly."""
+        result = self.client._parse_prometheus_text(SAMPLE_PROMETHEUS)
+        outlet1 = result["outlets"][0]
+        self.assertEqual(outlet1["outlet_number"], 1)
+        self.assertEqual(outlet1["name"], "Server01")
+        self.assertEqual(outlet1["current_a"], 0.0)
+        self.assertEqual(outlet1["power_w"], 0.0)
+        self.assertEqual(outlet1["voltage_v"], 199.71)
+        self.assertEqual(outlet1["power_factor"], 1.0)
+        self.assertEqual(outlet1["energy_wh"], 553051.0)
+
+    def test_outlet_empty_name(self):
+        """Empty outletname becomes empty string."""
+        result = self.client._parse_prometheus_text(SAMPLE_PROMETHEUS)
+        self.assertEqual(result["outlets"][1]["name"], "")
+
+    def test_outlet_number_ordering(self):
+        """Outlets are sorted by outlet_number ascending."""
+        result = self.client._parse_prometheus_text(SAMPLE_PROMETHEUS)
+        numbers = [o["outlet_number"] for o in result["outlets"]]
+        self.assertEqual(numbers, sorted(numbers))
+
+    def test_ocp_lines_skipped(self):
+        """OCP and poleline entries are not counted as outlets or inlets."""
+        result = self.client._parse_prometheus_text(SAMPLE_PROMETHEUS)
+        for outlet in result["outlets"]:
+            self.assertIn("outlet_number", outlet)
+        self.assertEqual(len(result["outlets"]), 2)
+
+    def test_inlet_metrics(self):
+        """Inlet metrics are parsed correctly."""
+        result = self.client._parse_prometheus_text(SAMPLE_PROMETHEUS)
+        self.assertEqual(len(result["inlets"]), 1)
+        inlet = result["inlets"][0]
+        self.assertEqual(inlet["inlet_number"], 1)
+        self.assertEqual(inlet["name"], "Main")
+        self.assertEqual(inlet["current_a"], 0.64)
+        self.assertEqual(inlet["power_w"], 124.49)
+        self.assertEqual(inlet["apparent_power_va"], 128.44)
+        self.assertEqual(inlet["voltage_v"], 199.71)
+        self.assertEqual(inlet["power_factor"], 0.97)
+        self.assertEqual(inlet["frequency_hz"], 50.0)
+        self.assertEqual(inlet["energy_wh"], 30857906.58)
+
+    def test_unknown_metrics_ignored(self):
+        """Unknown metric names do not cause errors and are ignored."""
+        text = 'unknown_metric{outletid="1"} 99.0\n'
+        result = self.client._parse_prometheus_text(text)
+        self.assertEqual(result["outlets"], [])
+
+    def test_empty_text(self):
+        """Empty input returns empty lists."""
+        result = self.client._parse_prometheus_text("")
+        self.assertEqual(result["outlets"], [])
+        self.assertEqual(result["inlets"], [])
+
+
+class TestGetAllMetricsPrometheus(unittest.TestCase):
+    """Tests for get_all_metrics_prometheus()."""
+
+    def setUp(self):
+        self.client = _make_client()
+
+    def _mock_get(self, text, status_code=200):
+        resp = MagicMock()
+        resp.status_code = status_code
+        resp.text = text
+        resp.raise_for_status = MagicMock()
+        if status_code >= 400:
+            resp.raise_for_status.side_effect = requests.exceptions.HTTPError(response=resp)
+        self.client.session.get.return_value = resp
+
+    def test_calls_prometheus_endpoint(self):
+        """Requests the correct Prometheus URL with include_names=1."""
+        self._mock_get(SAMPLE_PROMETHEUS)
+        self.client.get_all_metrics_prometheus()
+        call_url = self.client.session.get.call_args[0][0]
+        self.assertIn("/cgi-bin/dump_prometheus.cgi", call_url)
+        self.assertIn("include_names=1", call_url)
+
+    def test_returns_parsed_data(self):
+        """Returns parsed outlet and inlet data."""
+        self._mock_get(SAMPLE_PROMETHEUS)
+        result = self.client.get_all_metrics_prometheus()
+        self.assertIn("outlets", result)
+        self.assertIn("inlets", result)
+        self.assertEqual(len(result["outlets"]), 2)
+
+    def test_raises_on_http_error(self):
+        """Raises PDUClientError on HTTP 401."""
+        self._mock_get("", status_code=401)
+        with self.assertRaises(PDUClientError):
+            self.client.get_all_metrics_prometheus()
+
+    def test_raises_on_connection_error(self):
+        """Raises PDUClientError on ConnectionError."""
+        self.client.session.get.side_effect = requests.exceptions.ConnectionError("refused")
+        with self.assertRaises(PDUClientError):
+            self.client.get_all_metrics_prometheus()
+
+    def test_supports_prometheus_metrics_flag(self):
+        """RaritanPDUClient.supports_prometheus_metrics is True."""
+        self.assertTrue(self.client.supports_prometheus_metrics)
+
+
 if __name__ == "__main__":
     unittest.main()

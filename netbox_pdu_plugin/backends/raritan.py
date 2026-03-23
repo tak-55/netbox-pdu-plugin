@@ -14,6 +14,7 @@ Main resource paths:
 """
 
 import logging
+import re
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -22,9 +23,21 @@ from .base import BasePDUClient, PDUClientError
 
 logger = logging.getLogger(__name__)
 
+_PROMETHEUS_METRIC_MAP = {
+    "raritan_pdu_current_ampere": "current_a",
+    "raritan_pdu_activepower_watt": "power_w",
+    "raritan_pdu_apparentpower_voltampere": "apparent_power_va",
+    "raritan_pdu_voltage_volt": "voltage_v",
+    "raritan_pdu_powerfactor": "power_factor",
+    "raritan_pdu_linefrequency_hertz": "frequency_hz",
+    "raritan_pdu_activeenergy_watthour_total": "energy_wh",
+}
+
 
 class RaritanPDUClient(BasePDUClient):
     """Raritan Xerus PDU JSON-RPC 2.0 client."""
+
+    supports_prometheus_metrics: bool = True
 
     def __init__(self, base_url: str, username: str, password: str, verify_ssl: bool = True, **kwargs):
         super().__init__(base_url, username, password, verify_ssl)
@@ -81,6 +94,119 @@ class RaritanPDUClient(BasePDUClient):
             raise PDUClientError(f"HTTP error {response.status_code}: {e}") from e
         except ValueError as e:
             raise PDUClientError(f"JSON parse error: {e}") from e
+
+    def _parse_prometheus_text(self, text: str) -> dict:
+        """
+        Parse Prometheus text exposition format from Raritan PDU.
+
+        Returns:
+            {
+                "outlets": [{"outlet_number": int, "name": str, "current_a": float|None, ...}],
+                "inlets":  [{"inlet_number": int,  "name": str, "current_a": float|None, ...}],
+            }
+        Skips OCP (overcurrentprotector) and per-poleline lines.
+        Outlet IDs are numeric strings ("1", "2", ...).
+        Inlet IDs are like "I1", "I2".
+        """
+        line_re = re.compile(r"^(\w+)\{([^}]+)\}\s+([\d.eE+\-]+)")
+        label_re = re.compile(r'(\w+)="([^"]*)"')
+
+        outlets: dict[str, dict] = {}
+        inlets: dict[str, dict] = {}
+
+        for line in text.splitlines():
+            if line.startswith("#") or not line.strip():
+                continue
+            m = line_re.match(line)
+            if not m:
+                continue
+            metric_name, labels_str, value_str = m.groups()
+
+            field = _PROMETHEUS_METRIC_MAP.get(metric_name)
+            if not field:
+                continue
+
+            labels = dict(label_re.findall(labels_str))
+
+            # Skip OCP lines and per-poleline lines
+            if "overcurrentprotectorid" in labels or "poleline" in labels:
+                continue
+
+            try:
+                value = round(float(value_str), 2)
+            except ValueError:
+                continue
+
+            outlet_id = labels.get("outletid")
+            inlet_id = labels.get("inletid")
+
+            if outlet_id:
+                if outlet_id not in outlets:
+                    outlets[outlet_id] = {"name": labels.get("outletname", "")}
+                outlets[outlet_id][field] = value
+            elif inlet_id:
+                if inlet_id not in inlets:
+                    inlets[inlet_id] = {"name": labels.get("inletname", "")}
+                if field not in inlets[inlet_id]:
+                    inlets[inlet_id][field] = value
+
+        outlet_list = []
+        for oid in sorted(outlets, key=lambda x: int(x)):
+            d = outlets[oid]
+            outlet_list.append(
+                {
+                    "outlet_number": int(oid),
+                    "name": d.get("name", ""),
+                    "current_a": d.get("current_a"),
+                    "power_w": d.get("power_w"),
+                    "voltage_v": d.get("voltage_v"),
+                    "power_factor": d.get("power_factor"),
+                    "energy_wh": d.get("energy_wh"),
+                }
+            )
+
+        inlet_list = []
+        for iid in sorted(inlets):
+            d = inlets[iid]
+            inlet_num_m = re.search(r"\d+", iid)
+            inlet_list.append(
+                {
+                    "inlet_number": int(inlet_num_m.group()) if inlet_num_m else 1,
+                    "name": d.get("name", ""),
+                    "current_a": d.get("current_a"),
+                    "power_w": d.get("power_w"),
+                    "apparent_power_va": d.get("apparent_power_va"),
+                    "voltage_v": d.get("voltage_v"),
+                    "power_factor": d.get("power_factor"),
+                    "frequency_hz": d.get("frequency_hz"),
+                    "energy_wh": d.get("energy_wh"),
+                }
+            )
+
+        return {"outlets": outlet_list, "inlets": inlet_list}
+
+    def get_all_metrics_prometheus(self) -> dict:
+        """
+        Fetch all outlet and inlet metrics from the Raritan Prometheus endpoint.
+
+        Single HTTP GET request to /cgi-bin/dump_prometheus.cgi?include_names=1.
+        Returns {"outlets": [...], "inlets": [...]}.
+        Does NOT return outlet switching state or energy reset time.
+        Raises PDUClientError on any network or HTTP failure.
+        """
+        url = f"{self.base_url}/cgi-bin/dump_prometheus.cgi?include_names=1"
+        try:
+            response = self.session.get(url, verify=self.verify_ssl, timeout=10)
+            response.raise_for_status()
+        except requests.exceptions.SSLError as e:
+            raise PDUClientError(f"SSL error: {e}") from e
+        except requests.exceptions.ConnectionError as e:
+            raise PDUClientError(f"Connection error: {e}") from e
+        except requests.exceptions.Timeout as e:
+            raise PDUClientError(f"Request timed out: {url}") from e
+        except requests.exceptions.HTTPError as e:
+            raise PDUClientError(f"HTTP error {response.status_code}: {e}") from e
+        return self._parse_prometheus_text(response.text)
 
     # ------------------------------------------------------------------
     # Internal helpers
