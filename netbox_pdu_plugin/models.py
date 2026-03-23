@@ -148,6 +148,17 @@ class ManagedPDU(NetBoxModel):
     def get_sync_status_color(self):
         return SyncStatusChoices.colors.get(self.sync_status)
 
+    @property
+    def phase_type(self):
+        """Returns 'three' if 3-phase data exists, 'single' if inlets exist but no 3-phase data, None if unknown."""
+        if self.inlet_linepairs.exists():
+            return "three"
+        if self.inlets.filter(poleline_l1_current_a__isnull=False).exists():
+            return "three"
+        if self.inlets.exists():
+            return "single"
+        return None
+
 
 class PDUOutlet(NetBoxModel):
     """

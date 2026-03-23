@@ -117,7 +117,7 @@
           </div>
         {% endif %}
       </div>
-      {% if object.pdu_model or object.serial_number or object.firmware_version or object.rated_voltage or object.rated_current %}
+      {% if object.pdu_model or object.serial_number or object.firmware_version or object.rated_voltage or object.rated_current or object.phase_type %}
       <div class="card">
         <h2 class="card-header">Hardware Info</h2>
         <table class="table table-hover attr-table">
@@ -156,6 +156,18 @@
           <tr>
             <th scope="row">Rated Power</th>
             <td>{{ object.rated_power|placeholder }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Phase Type</th>
+            <td>
+              {% if object.phase_type == "three" %}
+                <span class="badge bg-info text-dark">三相 (Three-Phase)</span>
+              {% elif object.phase_type == "single" %}
+                <span class="badge bg-secondary">単相 (Single-Phase)</span>
+              {% else %}
+                {{ ""|placeholder }}
+              {% endif %}
+            </td>
           </tr>
           <tr>
             <th scope="row">Device Time</th>
