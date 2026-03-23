@@ -82,6 +82,7 @@ OUTLET_SYNC_BUTTON = """
 """
 
 INLET_SYNC_BUTTON = """
+{% if perms.netbox_pdu_plugin.change_managedpdu %}
 <form method="post" action="{% url 'plugins:netbox_pdu_plugin:pduinlet_sync' pk=record.pk %}" style="display:inline">
   {% csrf_token %}
   <button type="submit" class="btn btn-sm btn-outline-primary" title="Sync this inlet">
@@ -94,6 +95,7 @@ INLET_SYNC_BUTTON = """
     <i class="mdi mdi-upload"></i>
   </button>
 </form>
+{% endif %}
 """
 
 
