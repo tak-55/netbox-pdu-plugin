@@ -209,6 +209,12 @@ class PDUOutlet(NetBoxModel):
         verbose_name=_("Power (W)"),
         help_text=_("Active power (watts)"),
     )
+    apparent_power_va = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Apparent Power (VA)"),
+        help_text=_("Apparent power (volt-amperes)"),
+    )
     voltage_v = models.FloatField(
         null=True,
         blank=True,
