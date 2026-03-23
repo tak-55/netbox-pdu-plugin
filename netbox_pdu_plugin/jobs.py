@@ -155,14 +155,10 @@ if _metrics_interval > 0:
                 try:
                     outlet_updated, inlet_updated, ocp_updated = fetch_pdu_metrics(pdu)
                     self.logger.info(
-                        "Metrics fetched [%s]: outlets=%d inlets=%d ocps=%d",
-                        pdu,
-                        outlet_updated,
-                        inlet_updated,
-                        ocp_updated,
+                        f"Metrics fetched [{pdu}]: outlets={outlet_updated} inlets={inlet_updated} ocps={ocp_updated}"
                     )
                     success += 1
                 except Exception as e:
-                    self.logger.error("Metrics fetch failed [%s]: %s", pdu, e)
+                    self.logger.error(f"Metrics fetch failed [{pdu}]: {e}")
                     failed += 1
-            self.logger.info("Periodic metrics complete: %d OK, %d failed", success, failed)
+            self.logger.info(f"Periodic metrics complete: {success} OK, {failed} failed")
