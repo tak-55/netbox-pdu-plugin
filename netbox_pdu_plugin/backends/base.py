@@ -30,6 +30,9 @@ class BasePDUClient(ABC):
         self.password = password
         self.verify_ssl = verify_ssl
 
+    #: Set to True in backends that implement get_all_metrics_prometheus().
+    supports_prometheus_metrics: bool = False
+
     @abstractmethod
     def get_pdu_info(self) -> dict:
         """
