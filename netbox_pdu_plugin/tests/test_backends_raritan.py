@@ -913,12 +913,16 @@ class TestParsePrometheusText(unittest.TestCase):
         numbers = [o["outlet_number"] for o in result["outlets"]]
         self.assertEqual(numbers, sorted(numbers))
 
-    def test_ocp_lines_skipped(self):
-        """OCP and poleline entries are not counted as outlets or inlets."""
+    def test_ocp_goes_to_ocps_not_outlets(self):
+        """OCP entries go to ocps list, not outlets or inlets."""
         result = self.client._parse_prometheus_text(SAMPLE_PROMETHEUS)
+        # Outlets unchanged
+        self.assertEqual(len(result["outlets"]), 2)
         for outlet in result["outlets"]:
             self.assertIn("outlet_number", outlet)
-        self.assertEqual(len(result["outlets"]), 2)
+        # OCP is in its own list
+        self.assertEqual(len(result["ocps"]), 1)
+        self.assertEqual(result["ocps"][0]["ocp_id"], "C1")
 
     def test_inlet_metrics(self):
         """Inlet metrics are parsed correctly."""
@@ -946,6 +950,122 @@ class TestParsePrometheusText(unittest.TestCase):
         result = self.client._parse_prometheus_text("")
         self.assertEqual(result["outlets"], [])
         self.assertEqual(result["inlets"], [])
+        self.assertEqual(result["ocps"], [])
+
+
+SAMPLE_PROMETHEUS_3PHASE = """\
+# 3-phase inlet: total
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 33.0
+raritan_pdu_activepower_watt{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 6639.22
+raritan_pdu_apparentpower_voltampere{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 6758.79
+raritan_pdu_voltage_volt{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 100.0
+raritan_pdu_powerfactor{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 0.98
+raritan_pdu_linefrequency_hertz{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 60.0
+raritan_pdu_activeenergy_watthour_total{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 999.0
+# 3-phase inlet: poleline currents
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", inletid="I1", inletname="", poleline="L1"} 22.0
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", inletid="I1", inletname="", poleline="L2"} 15.0
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", inletid="I1", inletname="", poleline="L3"} 20.0
+# 3-phase inlet: linepairs
+raritan_pdu_voltage_volt{pduid="1", pduname="pdu3", inletid="I1", inletname="", linepair="L1L2"} 204.26
+raritan_pdu_voltage_volt{pduid="1", pduname="pdu3", inletid="I1", inletname="", linepair="L2L3"} 203.30
+raritan_pdu_voltage_volt{pduid="1", pduname="pdu3", inletid="I1", inletname="", linepair="L3L1"} 204.15
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", inletid="I1", inletname="", linepair="L1L2"} 9.67
+raritan_pdu_activepower_watt{pduid="1", pduname="pdu3", inletid="I1", inletname="", linepair="L1L2"} 1924.39
+raritan_pdu_apparentpower_voltampere{pduid="1", pduname="pdu3", inletid="I1", inletname="", linepair="L1L2"} 1972.42
+raritan_pdu_powerfactor{pduid="1", pduname="pdu3", inletid="I1", inletname="", linepair="L1L2"} 0.98
+raritan_pdu_activeenergy_watthour_total{pduid="1", pduname="pdu3", inletid="I1", inletname="", linepair="L1L2"} 59793486.15
+# 3-phase inlet: unbalance
+raritan_pdu_unbalancedcurrent_percent{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 21.66
+raritan_pdu_unbalancedlinelinecurrent_percent{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 42.0
+raritan_pdu_unbalancedlinelinevoltage_percent{pduid="1", pduname="pdu3", inletid="I1", inletname=""} 0.27
+# OCP: C1 (total + poleline + rating + trip=1 → not tripped)
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", overcurrentprotectorid="C1", overcurrentprotectorname=""} 9.72
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", overcurrentprotectorid="C1", overcurrentprotectorname="", poleline="L1"} 9.72
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", overcurrentprotectorid="C1", overcurrentprotectorname="", poleline="L2"} 9.72
+raritan_pdu_ocprating{pduid="1", pduname="pdu3", overcurrentprotectorid="C1", overcurrentprotectorname=""} 20.0
+raritan_pdu_trip{pduid="1", pduname="pdu3", overcurrentprotectorid="C1", overcurrentprotectorname=""} 1
+# OCP: C2 (trip=0 → tripped)
+raritan_pdu_current_ampere{pduid="1", pduname="pdu3", overcurrentprotectorid="C2", overcurrentprotectorname=""} 7.61
+raritan_pdu_trip{pduid="1", pduname="pdu3", overcurrentprotectorid="C2", overcurrentprotectorname=""} 0
+"""
+
+
+class TestParsePrometheusText3Phase(unittest.TestCase):
+    """Tests for _parse_prometheus_text() with 3-phase PDU data."""
+
+    def setUp(self):
+        self.client = _make_client()
+        self.result = self.client._parse_prometheus_text(SAMPLE_PROMETHEUS_3PHASE)
+
+    def test_inlet_poleline_currents(self):
+        """Per-phase (poleline) currents are parsed into inlet entry."""
+        inlet = self.result["inlets"][0]
+        self.assertEqual(inlet["poleline_l1_current_a"], 22.0)
+        self.assertEqual(inlet["poleline_l2_current_a"], 15.0)
+        self.assertEqual(inlet["poleline_l3_current_a"], 20.0)
+
+    def test_inlet_unbalance(self):
+        """Unbalance metrics are parsed into inlet entry."""
+        inlet = self.result["inlets"][0]
+        self.assertEqual(inlet["unbalanced_current_pct"], 21.66)
+        self.assertEqual(inlet["unbalanced_ll_current_pct"], 42.0)
+        self.assertEqual(inlet["unbalanced_ll_voltage_pct"], 0.27)
+
+    def test_linepair_count(self):
+        """Linepairs are parsed for each line-pair label."""
+        inlet = self.result["inlets"][0]
+        lp_keys = [lp["line_pair"] for lp in inlet["linepairs"]]
+        self.assertIn("L1L2", lp_keys)
+        # Only L1L2 has full data in sample; L2L3/L3L1 have voltage only
+        self.assertGreaterEqual(len(inlet["linepairs"]), 1)
+
+    def test_linepair_l1l2_metrics(self):
+        """L1L2 linepair metrics are parsed correctly."""
+        inlet = self.result["inlets"][0]
+        l1l2 = next(lp for lp in inlet["linepairs"] if lp["line_pair"] == "L1L2")
+        self.assertEqual(l1l2["voltage_v"], 204.26)
+        self.assertEqual(l1l2["current_a"], 9.67)
+        self.assertEqual(l1l2["power_w"], 1924.39)
+        self.assertEqual(l1l2["apparent_power_va"], 1972.42)
+        self.assertEqual(l1l2["power_factor"], 0.98)
+        self.assertEqual(l1l2["energy_wh"], 59793486.15)
+
+    def test_ocp_count(self):
+        """Both OCPs are parsed."""
+        self.assertEqual(len(self.result["ocps"]), 2)
+
+    def test_ocp_metrics(self):
+        """OCP C1 metrics are parsed correctly."""
+        c1 = next(o for o in self.result["ocps"] if o["ocp_id"] == "C1")
+        self.assertEqual(c1["current_a"], 9.72)
+        self.assertEqual(c1["rating_current_a"], 20.0)
+        self.assertEqual(c1["poleline_l1_current_a"], 9.72)
+        self.assertEqual(c1["poleline_l2_current_a"], 9.72)
+        self.assertIsNone(c1["poleline_l3_current_a"])
+
+    def test_ocp_trip_not_tripped(self):
+        """trip_state=1 maps to tripped=False."""
+        c1 = next(o for o in self.result["ocps"] if o["ocp_id"] == "C1")
+        self.assertFalse(c1["tripped"])
+
+    def test_ocp_trip_tripped(self):
+        """trip_state=0 maps to tripped=True."""
+        c2 = next(o for o in self.result["ocps"] if o["ocp_id"] == "C2")
+        self.assertTrue(c2["tripped"])
+
+    def test_poleline_not_in_outlets_or_inlets_total(self):
+        """Poleline lines do not overwrite inlet total current."""
+        inlet = self.result["inlets"][0]
+        # Total current should be 33.0 (from line without poleline)
+        self.assertEqual(inlet["current_a"], 33.0)
+
+    def test_inlet_total_fields_still_present(self):
+        """Existing total fields are still populated alongside 3-phase fields."""
+        inlet = self.result["inlets"][0]
+        self.assertEqual(inlet["power_w"], 6639.22)
+        self.assertEqual(inlet["frequency_hz"], 60.0)
+        self.assertEqual(inlet["energy_wh"], 999.0)
 
 
 class TestGetAllMetricsPrometheus(unittest.TestCase):
@@ -972,11 +1092,12 @@ class TestGetAllMetricsPrometheus(unittest.TestCase):
         self.assertIn("include_names=1", call_url)
 
     def test_returns_parsed_data(self):
-        """Returns parsed outlet and inlet data."""
+        """Returns parsed outlet, inlet, and OCP data."""
         self._mock_get(SAMPLE_PROMETHEUS)
         result = self.client.get_all_metrics_prometheus()
         self.assertIn("outlets", result)
         self.assertIn("inlets", result)
+        self.assertIn("ocps", result)
         self.assertEqual(len(result["outlets"]), 2)
 
     def test_raises_on_http_error(self):
