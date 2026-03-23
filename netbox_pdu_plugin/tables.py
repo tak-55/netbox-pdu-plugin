@@ -48,9 +48,9 @@ class ManagedPDUTable(NetBoxTable):
             "pdu_model",
             "serial_number",
             "firmware_version",
+            "outlet_count",
             "sync_status",
             "last_synced",
-            "outlet_count",
             "actions",
         )
 
