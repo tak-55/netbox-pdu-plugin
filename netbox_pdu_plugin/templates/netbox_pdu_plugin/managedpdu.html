@@ -95,6 +95,10 @@
             <th scope="row">Last Synced</th>
             <td>{{ object.last_synced|placeholder }}</td>
           </tr>
+          <tr>
+            <th scope="row">Last Metrics Fetched</th>
+            <td>{{ object.last_metrics_fetched|placeholder }}</td>
+          </tr>
         </table>
         {% if perms.netbox_pdu_plugin.change_managedpdu %}
           <div class="card-footer d-flex gap-2">

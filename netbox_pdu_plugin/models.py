@@ -51,6 +51,11 @@ class ManagedPDU(NetBoxModel):
         blank=True,
         verbose_name=_("Last Synced"),
     )
+    last_metrics_fetched = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Last Metrics Fetched"),
+    )
     sync_status = models.CharField(
         max_length=30,
         choices=SyncStatusChoices,

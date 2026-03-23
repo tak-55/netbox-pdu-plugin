@@ -298,6 +298,9 @@ class ManagedPDUGetMetricsView(View):
                         inlet_number=inlet_data["inlet_number"],
                     ).update(**update_fields)
 
+            managed_pdu.last_metrics_fetched = now
+            managed_pdu.save(update_fields=["last_metrics_fetched"])
+
             messages.success(
                 request,
                 f"Metrics updated: {outlet_updated} outlets, {inlet_updated} inlets.",
