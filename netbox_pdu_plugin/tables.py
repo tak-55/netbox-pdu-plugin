@@ -47,6 +47,7 @@ class ManagedPDUTable(NetBoxTable):
 
 
 OUTLET_SYNC_BUTTON = """
+{% if perms.netbox_pdu_plugin.change_managedpdu %}
 <form method="post" action="{% url 'plugins:netbox_pdu_plugin:pduoutlet_power_on' pk=record.pk %}" style="display:inline">
   {% csrf_token %}
   <button type="submit" class="btn btn-sm btn-success" title="Power ON">
@@ -77,6 +78,7 @@ OUTLET_SYNC_BUTTON = """
     <i class="mdi mdi-upload"></i>
   </button>
 </form>
+{% endif %}
 """
 
 INLET_SYNC_BUTTON = """
