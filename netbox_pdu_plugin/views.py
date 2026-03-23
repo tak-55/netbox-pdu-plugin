@@ -237,6 +237,85 @@ class ManagedPDUSyncView(View):
         return redirect(managed_pdu.get_absolute_url())
 
 
+class ManagedPDUGetMetricsView(View):
+    """
+    Fetch outlet/inlet metrics from the Prometheus endpoint and update metric
+    fields only. Does not touch outlet status, energy_reset_at, or PDU hardware
+    info. Only available for backends that support Prometheus metrics.
+    """
+
+    def post(self, request, pk):
+        managed_pdu = get_object_or_404(models.ManagedPDU, pk=pk)
+
+        if not request.user.has_perm("netbox_pdu_plugin.change_managedpdu"):
+            messages.error(request, _("You do not have permission to update metrics."))
+            return redirect(managed_pdu.get_absolute_url())
+
+        client = get_pdu_client(managed_pdu)
+
+        if not client.supports_prometheus_metrics:
+            messages.warning(request, _("This PDU vendor does not support Prometheus metrics."))
+            return redirect(managed_pdu.get_absolute_url())
+
+        try:
+            with transaction.atomic():
+                now = timezone.now()
+                data = client.get_all_metrics_prometheus()
+
+                outlet_updated = 0
+                for outlet_data in data.get("outlets", []):
+                    update_fields = {
+                        "current_a": outlet_data.get("current_a"),
+                        "power_w": outlet_data.get("power_w"),
+                        "voltage_v": outlet_data.get("voltage_v"),
+                        "power_factor": outlet_data.get("power_factor"),
+                        "energy_wh": outlet_data.get("energy_wh"),
+                        "last_updated_from_pdu": now,
+                    }
+                    if outlet_data.get("name"):
+                        update_fields["outlet_name"] = outlet_data["name"]
+                    outlet_updated += models.PDUOutlet.objects.filter(
+                        managed_pdu=managed_pdu,
+                        outlet_number=outlet_data["outlet_number"],
+                    ).update(**update_fields)
+
+                inlet_updated = 0
+                for inlet_data in data.get("inlets", []):
+                    update_fields = {
+                        "current_a": inlet_data.get("current_a"),
+                        "power_w": inlet_data.get("power_w"),
+                        "apparent_power_va": inlet_data.get("apparent_power_va"),
+                        "voltage_v": inlet_data.get("voltage_v"),
+                        "power_factor": inlet_data.get("power_factor"),
+                        "frequency_hz": inlet_data.get("frequency_hz"),
+                        "energy_wh": inlet_data.get("energy_wh"),
+                        "last_updated_from_pdu": now,
+                    }
+                    if inlet_data.get("name"):
+                        update_fields["inlet_name"] = inlet_data["name"]
+                    inlet_updated += models.PDUInlet.objects.filter(
+                        managed_pdu=managed_pdu,
+                        inlet_number=inlet_data["inlet_number"],
+                    ).update(**update_fields)
+
+            messages.success(
+                request,
+                f"Metrics updated: {outlet_updated} outlets, {inlet_updated} inlets.",
+            )
+            logger.info(
+                "Metrics fetch succeeded [%s]: outlets=%d inlets=%d",
+                managed_pdu,
+                outlet_updated,
+                inlet_updated,
+            )
+
+        except PDUClientError as e:
+            messages.error(request, f"Metrics fetch error: {e}")
+            logger.error("Metrics fetch failed [%s]: %s", managed_pdu, e)
+
+        return redirect(managed_pdu.get_absolute_url())
+
+
 #
 # PDUOutlet views
 #

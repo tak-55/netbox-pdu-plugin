@@ -18,6 +18,11 @@ urlpatterns = (
         views.ManagedPDUSyncView.as_view(),
         name="managedpdu_sync",
     ),
+    path(
+        "managed-pdus/<int:pk>/get-metrics/",
+        views.ManagedPDUGetMetricsView.as_view(),
+        name="managedpdu_get_metrics",
+    ),
     # PDU Outlet
     path(
         "outlets/",
