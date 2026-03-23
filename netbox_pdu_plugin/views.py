@@ -46,6 +46,7 @@ class ManagedPDUView(generic.ObjectView):
         outlets_table = tables.PDUOutletTable(outlets)
         outlets_table.columns.hide("managed_pdu")
         outlets_table.configure(request)
+        outlets_table.columns.show("pk")  # Always show checkbox for bulk actions
 
         inlets = instance.inlets.restrict(request.user, "view").order_by("inlet_number")
         inlets_table = tables.PDUInletTable(inlets)
