@@ -28,5 +28,9 @@ class PduConfig(PluginConfig):
     graphql_schema = "graphql.schema"
     queues = ["default"]
 
+    def ready(self):
+        super().ready()
+        from . import jobs  # noqa: F401 — registers @system_job if metrics_poll_interval is set
+
 
 config = PduConfig
