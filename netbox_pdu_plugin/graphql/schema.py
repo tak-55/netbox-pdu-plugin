@@ -4,7 +4,7 @@ import strawberry_django
 from .types import ManagedPDUType, PDUInletType, PDUOutletType
 
 
-@strawberry.type(name='Query')
+@strawberry.type(name="Query")
 class NetBoxMgmtPDUQuery:
     managed_pdu: ManagedPDUType = strawberry_django.field()
     managed_pdu_list: list[ManagedPDUType] = strawberry_django.field()

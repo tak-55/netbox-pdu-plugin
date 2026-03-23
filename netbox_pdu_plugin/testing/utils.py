@@ -30,11 +30,12 @@ def get_random_string(length: int = 10, charset: str = string.ascii_letters + st
         >>> name = get_random_string(20)
         >>> slug = get_random_string(10, string.ascii_lowercase + string.digits)
     """
-    return ''.join(random.choices(charset, k=length))
+    return "".join(random.choices(charset, k=length))
 
 
-def create_test_user(username: str | None = None, permissions: list[str | None] = None,
-                    is_staff: bool = True, is_superuser: bool = False) -> User:
+def create_test_user(
+    username: str | None = None, permissions: list[str | None] = None, is_staff: bool = True, is_superuser: bool = False
+) -> User:
     """
     Create a test user with optional permissions.
 
@@ -60,18 +61,15 @@ def create_test_user(username: str | None = None, permissions: list[str | None] 
         email=f"{username}@example.com",
         is_staff=is_staff,
         is_superuser=is_superuser,
-        password="testpass123"
+        password="testpass123",
     )
 
     if permissions and not is_superuser:
         from django.contrib.auth.models import Permission
 
         for permission_string in permissions:
-            app_label, codename = permission_string.split('.')
-            permission = Permission.objects.get(
-                content_type__app_label=app_label,
-                codename=codename
-            )
+            app_label, codename = permission_string.split(".")
+            permission = Permission.objects.get(content_type__app_label=app_label, codename=codename)
             user.user_permissions.add(permission)
 
     return user
@@ -106,15 +104,12 @@ def post_data(data: dict[str, Any]) -> dict[str, Any]:
             post_dict[key] = value
 
         # Handle model instances (foreign keys)
-        elif hasattr(value, 'pk'):
+        elif hasattr(value, "pk"):
             post_dict[key] = value.pk
 
         # Handle lists (many-to-many or multi-select)
         elif isinstance(value, list | tuple):
-            post_dict[key] = [
-                obj.pk if hasattr(obj, 'pk') else obj
-                for obj in value
-            ]
+            post_dict[key] = [obj.pk if hasattr(obj, "pk") else obj for obj in value]
 
         # Handle booleans (convert to string for forms)
         elif isinstance(value, bool):
@@ -148,22 +143,22 @@ def extract_form_errors(response) -> dict[str, list[str]]:
     from bs4 import BeautifulSoup
 
     try:
-        soup = BeautifulSoup(response.content, 'html.parser')
+        soup = BeautifulSoup(response.content, "html.parser")
         errors = {}
 
         # Find all form fields with errors
-        for field in soup.find_all(class_='has-error') or soup.find_all(class_='is-invalid'):
+        for field in soup.find_all(class_="has-error") or soup.find_all(class_="is-invalid"):
             field_name = None
             field_errors = []
 
             # Try to find the field name from input/select/textarea
-            for input_elem in field.find_all(['input', 'select', 'textarea']):
-                if input_elem.get('name'):
-                    field_name = input_elem['name']
+            for input_elem in field.find_all(["input", "select", "textarea"]):
+                if input_elem.get("name"):
+                    field_name = input_elem["name"]
                     break
 
             # Find error messages
-            for error_elem in field.find_all(class_='error') or field.find_all(class_='invalid-feedback'):
+            for error_elem in field.find_all(class_="error") or field.find_all(class_="invalid-feedback"):
                 error_text = error_elem.get_text().strip()
                 if error_text:
                     field_errors.append(error_text)
@@ -229,10 +224,7 @@ def create_tags(names: list[str]):
 
     tags = []
     for name in names:
-        tag = Tag.objects.create(
-            name=name,
-            slug=name.lower().replace(' ', '-')
-        )
+        tag = Tag.objects.create(name=name, slug=name.lower().replace(" ", "-"))
         tags.append(tag)
 
     return tags
@@ -258,7 +250,7 @@ def get_deletable_objects(instances):
     from django.contrib.admin.utils import NestedObjects
     from django.db import DEFAULT_DB_ALIAS
 
-    if not hasattr(instances, '__iter__'):
+    if not hasattr(instances, "__iter__"):
         instances = [instances]
 
     collector = NestedObjects(using=DEFAULT_DB_ALIAS)
@@ -282,9 +274,7 @@ def get_deletable_objects(instances):
     return deletions
 
 
-def assert_object_changes(test_case, instance, action: str,
-                         user: User | None = None,
-                         message: str | None = None):
+def assert_object_changes(test_case, instance, action: str, user: User | None = None, message: str | None = None):
     """
     Assert that an ObjectChange entry was created for an action.
 
@@ -308,31 +298,28 @@ def assert_object_changes(test_case, instance, action: str,
         from extras.models import ObjectChange
 
         action_map = {
-            'create': ObjectChangeActionChoices.ACTION_CREATE,
-            'update': ObjectChangeActionChoices.ACTION_UPDATE,
-            'delete': ObjectChangeActionChoices.ACTION_DELETE,
+            "create": ObjectChangeActionChoices.ACTION_CREATE,
+            "update": ObjectChangeActionChoices.ACTION_UPDATE,
+            "delete": ObjectChangeActionChoices.ACTION_DELETE,
         }
 
         object_changes = ObjectChange.objects.filter(
             changed_object_type=ContentType.objects.get_for_model(instance),
             changed_object_id=instance.pk,
-            action=action_map[action]
+            action=action_map[action],
         )
 
         if user:
             object_changes = object_changes.filter(user=user)
 
-        test_case.assertTrue(
-            object_changes.exists(),
-            f"No ObjectChange found for {action} of {instance}"
-        )
+        test_case.assertTrue(object_changes.exists(), f"No ObjectChange found for {action} of {instance}")
 
         if message:
             change = object_changes.first()
             test_case.assertEqual(
                 change.changelog_message,
                 message,
-                f"Changelog message mismatch: {change.changelog_message} != {message}"
+                f"Changelog message mismatch: {change.changelog_message} != {message}",
             )
 
     except ImportError:
@@ -341,12 +328,12 @@ def assert_object_changes(test_case, instance, action: str,
 
 
 __all__ = [
-    'get_random_string',
-    'create_test_user',
-    'post_data',
-    'extract_form_errors',
-    'disable_warnings',
-    'create_tags',
-    'get_deletable_objects',
-    'assert_object_changes',
+    "get_random_string",
+    "create_test_user",
+    "post_data",
+    "extract_form_errors",
+    "disable_warnings",
+    "create_tags",
+    "get_deletable_objects",
+    "assert_object_changes",
 ]

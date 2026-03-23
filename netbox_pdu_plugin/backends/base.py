@@ -6,11 +6,13 @@ To add a new vendor:
 2. Register it in backends/__init__._VENDOR_BACKENDS
 3. Add the vendor to choices.VendorChoices
 """
+
 from abc import ABC, abstractmethod
 
 
 class PDUClientError(Exception):
     """Raised when communication with a PDU fails."""
+
     pass
 
 

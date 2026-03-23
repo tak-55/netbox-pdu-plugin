@@ -18,7 +18,7 @@ class ManagedPDUGraphQLTest(PluginGraphQLTestCase):
         cls.pdu = create_test_pdu()
 
     def test_query_managed_pdu_list(self):
-        self.add_permissions('netbox_pdu_plugin.view_managedpdu')
+        self.add_permissions("netbox_pdu_plugin.view_managedpdu")
         query = """
         query {
             managed_pdu_list {
@@ -29,20 +29,15 @@ class ManagedPDUGraphQLTest(PluginGraphQLTestCase):
         }
         """
         response = self.execute_query(query)
-        self.assertIsNone(response.get('errors'))
-        self.assertGreaterEqual(len(response['data']['managed_pdu_list']), 1)
+        self.assertIsNone(response.get("errors"))
+        self.assertGreaterEqual(len(response["data"]["managed_pdu_list"]), 1)
 
     def test_query_managed_pdu(self):
-        self.add_permissions('netbox_pdu_plugin.view_managedpdu')
-        query = (
-            "query { "
-            f"managed_pdu(id: {self.pdu.pk}) {{ "
-            "id vendor api_url "
-            "} }"
-        )
+        self.add_permissions("netbox_pdu_plugin.view_managedpdu")
+        query = f"query {{ managed_pdu(id: {self.pdu.pk}) {{ id vendor api_url }} }}"
         response = self.execute_query(query)
-        self.assertIsNone(response.get('errors'))
-        self.assertEqual(response['data']['managed_pdu']['id'], str(self.pdu.pk))
+        self.assertIsNone(response.get("errors"))
+        self.assertEqual(response["data"]["managed_pdu"]["id"], str(self.pdu.pk))
 
 
 class PDUOutletGraphQLTest(PluginGraphQLTestCase):
@@ -54,11 +49,11 @@ class PDUOutletGraphQLTest(PluginGraphQLTestCase):
         cls.outlet = PDUOutlet.objects.create(
             managed_pdu=cls.pdu,
             outlet_number=1,
-            outlet_name='Outlet 1',
+            outlet_name="Outlet 1",
         )
 
     def test_query_outlet_list(self):
-        self.add_permissions('netbox_pdu_plugin.view_pduoutlet')
+        self.add_permissions("netbox_pdu_plugin.view_pduoutlet")
         query = """
         query {
             pdu_outlet_list {
@@ -69,8 +64,8 @@ class PDUOutletGraphQLTest(PluginGraphQLTestCase):
         }
         """
         response = self.execute_query(query)
-        self.assertIsNone(response.get('errors'))
-        self.assertGreaterEqual(len(response['data']['pdu_outlet_list']), 1)
+        self.assertIsNone(response.get("errors"))
+        self.assertGreaterEqual(len(response["data"]["pdu_outlet_list"]), 1)
 
 
 class PDUInletGraphQLTest(PluginGraphQLTestCase):
@@ -85,7 +80,7 @@ class PDUInletGraphQLTest(PluginGraphQLTestCase):
         )
 
     def test_query_inlet_list(self):
-        self.add_permissions('netbox_pdu_plugin.view_pduinlet')
+        self.add_permissions("netbox_pdu_plugin.view_pduinlet")
         query = """
         query {
             pdu_inlet_list {
@@ -95,5 +90,5 @@ class PDUInletGraphQLTest(PluginGraphQLTestCase):
         }
         """
         response = self.execute_query(query)
-        self.assertIsNone(response.get('errors'))
-        self.assertGreaterEqual(len(response['data']['pdu_inlet_list']), 1)
+        self.assertIsNone(response.get("errors"))
+        self.assertGreaterEqual(len(response["data"]["pdu_inlet_list"]), 1)

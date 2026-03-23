@@ -3,8 +3,8 @@ from .raritan import RaritanPDUClient
 from .unifi import UniFiPDUClient
 
 _VENDOR_BACKENDS = {
-    'raritan': RaritanPDUClient,
-    'ubiquiti': UniFiPDUClient,
+    "raritan": RaritanPDUClient,
+    "ubiquiti": UniFiPDUClient,
 }
 
 
@@ -15,7 +15,7 @@ def get_pdu_client(managed_pdu) -> BasePDUClient:
     """
     backend_class = _VENDOR_BACKENDS.get(managed_pdu.vendor)
     if not backend_class:
-        raise PDUClientError(f'No backend registered for vendor: {managed_pdu.vendor!r}')
+        raise PDUClientError(f"No backend registered for vendor: {managed_pdu.vendor!r}")
     return backend_class(
         base_url=managed_pdu.api_url,
         username=managed_pdu.api_username,

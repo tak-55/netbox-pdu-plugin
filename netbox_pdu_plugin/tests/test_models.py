@@ -13,16 +13,16 @@ from ..choices import OutletStatusChoices, SyncStatusChoices, VendorChoices
 from ..models import ManagedPDU, PDUInlet, PDUNetworkInterface, PDUOutlet
 
 
-def create_test_device(name: str = 'Test PDU') -> Device:
+def create_test_device(name: str = "Test PDU") -> Device:
     """Create a minimal Device for use in ManagedPDU tests."""
-    manufacturer, _ = Manufacturer.objects.get_or_create(name='Test Mfr', slug='test-mfr')
+    manufacturer, _ = Manufacturer.objects.get_or_create(name="Test Mfr", slug="test-mfr")
     device_type, _ = DeviceType.objects.get_or_create(
         manufacturer=manufacturer,
-        model='Test Model',
-        defaults={'slug': 'test-model'},
+        model="Test Model",
+        defaults={"slug": "test-model"},
     )
-    role, _ = DeviceRole.objects.get_or_create(name='PDU', defaults={'slug': 'pdu', 'color': 'aa1409'})
-    site, _ = Site.objects.get_or_create(name='Test Site', defaults={'slug': 'test-site'})
+    role, _ = DeviceRole.objects.get_or_create(name="PDU", defaults={"slug": "pdu", "color": "aa1409"})
+    site, _ = Site.objects.get_or_create(name="Test Site", defaults={"slug": "test-site"})
     return Device.objects.create(
         name=name,
         device_type=device_type,
@@ -36,11 +36,11 @@ def create_test_pdu(device: Device | None = None, **kwargs) -> ManagedPDU:
     if device is None:
         device = create_test_device()
     defaults = {
-        'vendor': VendorChoices.RARITAN,
-        'api_url': 'https://pdu.example.com',
-        'api_username': 'admin',
-        'api_password': 'secret',
-        'verify_ssl': False,
+        "vendor": VendorChoices.RARITAN,
+        "api_url": "https://pdu.example.com",
+        "api_username": "admin",
+        "api_password": "secret",
+        "verify_ssl": False,
     }
     defaults.update(kwargs)
     return ManagedPDU.objects.create(device=device, **defaults)
@@ -51,11 +51,11 @@ class ManagedPDUModelTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.device = create_test_device('PDU-1')
+        cls.device = create_test_device("PDU-1")
         cls.pdu = create_test_pdu(cls.device)
 
     def test_str(self):
-        self.assertIn('PDU', str(self.pdu))
+        self.assertIn("PDU", str(self.pdu))
 
     def test_get_absolute_url(self):
         url = self.pdu.get_absolute_url()
@@ -92,7 +92,7 @@ class PDUOutletModelTest(TestCase):
         cls.outlet = PDUOutlet.objects.create(
             managed_pdu=cls.pdu,
             outlet_number=1,
-            outlet_name='Outlet 1',
+            outlet_name="Outlet 1",
             status=OutletStatusChoices.ON,
             power_w=100.0,
             voltage_v=200.0,
@@ -100,7 +100,7 @@ class PDUOutletModelTest(TestCase):
         )
 
     def test_str(self):
-        self.assertIn('1', str(self.outlet))
+        self.assertIn("1", str(self.outlet))
 
     def test_get_absolute_url(self):
         url = self.outlet.get_absolute_url()
@@ -120,7 +120,7 @@ class PDUOutletModelTest(TestCase):
 
     def test_outlet_number_reusable_across_pdus(self):
         """Same outlet number can exist on different PDUs."""
-        other_pdu = create_test_pdu(create_test_device('PDU-2'))
+        other_pdu = create_test_pdu(create_test_device("PDU-2"))
         outlet = PDUOutlet.objects.create(
             managed_pdu=other_pdu,
             outlet_number=1,
@@ -137,14 +137,14 @@ class PDUInletModelTest(TestCase):
         cls.inlet = PDUInlet.objects.create(
             managed_pdu=cls.pdu,
             inlet_number=1,
-            inlet_name='Inlet 1',
+            inlet_name="Inlet 1",
             power_w=500.0,
             voltage_v=200.0,
             current_a=2.5,
         )
 
     def test_str(self):
-        self.assertIn('1', str(self.inlet))
+        self.assertIn("1", str(self.inlet))
 
     def test_get_absolute_url(self):
         url = self.inlet.get_absolute_url()
@@ -167,18 +167,18 @@ class PDUNetworkInterfaceModelTest(TestCase):
         cls.pdu = create_test_pdu()
         cls.nic = PDUNetworkInterface.objects.create(
             managed_pdu=cls.pdu,
-            interface_name='ETH1',
-            mac_address='00:11:22:33:44:55',
-            ip_address='192.168.1.100',
+            interface_name="ETH1",
+            mac_address="00:11:22:33:44:55",
+            ip_address="192.168.1.100",
         )
 
     def test_str(self):
-        self.assertIn('ETH1', str(self.nic))
+        self.assertIn("ETH1", str(self.nic))
 
     def test_unique_interface_per_pdu(self):
         """Interface names must be unique within a PDU."""
         with self.assertRaises(IntegrityError):
             PDUNetworkInterface.objects.create(
                 managed_pdu=self.pdu,
-                interface_name='ETH1',
+                interface_name="ETH1",
             )

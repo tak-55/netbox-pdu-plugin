@@ -19,12 +19,12 @@ def update_outlet_status(outlet_pk, api_url, username, password, verify_ssl, out
         outlet = PDUOutlet.objects.get(pk=outlet_pk)
         client = get_pdu_client(outlet.managed_pdu)
         new_state = client.get_outlet_power_state_by_index(outlet_index)
-        state_map = {'on': OutletStatusChoices.ON, 'off': OutletStatusChoices.OFF}
+        state_map = {"on": OutletStatusChoices.ON, "off": OutletStatusChoices.OFF}
 
         outlet.status = state_map.get(new_state, OutletStatusChoices.UNKNOWN)
         outlet.last_updated_from_pdu = timezone.now()
         outlet.save()
 
-        logger.info('Background status update for outlet pk=%s: %s', outlet_pk, new_state)
+        logger.info("Background status update for outlet pk=%s: %s", outlet_pk, new_state)
     except Exception as e:
-        logger.error('Background status update failed for outlet pk=%s: %s', outlet_pk, e)
+        logger.error("Background status update failed for outlet pk=%s: %s", outlet_pk, e)

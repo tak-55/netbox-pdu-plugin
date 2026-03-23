@@ -43,8 +43,7 @@ class PluginTestCase(DjangoTestCase):
         if self.user_permissions:
             self.add_permissions(*self.user_permissions)
 
-    def create_test_user(self, username: str = "testuser",
-                        is_superuser: bool = False) -> User:
+    def create_test_user(self, username: str = "testuser", is_superuser: bool = False) -> User:
         """
         Create a test user with sensible defaults.
 
@@ -56,10 +55,7 @@ class PluginTestCase(DjangoTestCase):
             User instance
         """
         return User.objects.create_user(
-            username=username,
-            email=f"{username}@example.com",
-            is_superuser=is_superuser,
-            password="testpass123"
+            username=username, email=f"{username}@example.com", is_superuser=is_superuser, password="testpass123"
         )
 
     def add_permissions(self, *permissions: str):
@@ -93,9 +89,7 @@ class PluginTestCase(DjangoTestCase):
         for name in permissions:
             object_type, action = resolve_permission_type(name)
             ObjectPermission.objects.filter(
-                actions__contains=[action],
-                object_types=object_type,
-                users=self.user
+                actions__contains=[action], object_types=object_type, users=self.user
             ).delete()
 
     def assertHttpStatus(self, response, expected_status: int, msg: str = None):
@@ -108,15 +102,13 @@ class PluginTestCase(DjangoTestCase):
             msg: Optional custom message
         """
         if response.status_code != expected_status:
-            error_msg = (
-                f"Expected HTTP {expected_status}, got {response.status_code}"
-            )
+            error_msg = f"Expected HTTP {expected_status}, got {response.status_code}"
 
             # Add response content if available
-            if hasattr(response, 'data'):
+            if hasattr(response, "data"):
                 error_msg += f"\nResponse data: {response.data}"
-            elif hasattr(response, 'content'):
-                content = response.content.decode('utf-8')[:500]
+            elif hasattr(response, "content"):
+                content = response.content.decode("utf-8")[:500]
                 error_msg += f"\nResponse content: {content}"
 
             if msg:
@@ -156,9 +148,7 @@ class PluginModelTestCase(PluginTestCase):
     - Support for foreign keys and many-to-many relationships
     """
 
-    def assertInstanceEqual(self, instance, data: dict[str, Any],
-                          exclude: set[str | None] = None,
-                          api: bool = False):
+    def assertInstanceEqual(self, instance, data: dict[str, Any], exclude: set[str | None] = None, api: bool = False):
         """
         Compare a model instance against a dictionary of expected values.
 
@@ -189,13 +179,10 @@ class PluginModelTestCase(PluginTestCase):
 
             actual_value = model_dict.get(field_name)
             self.assertEqual(
-                actual_value,
-                expected_value,
-                f"Field '{field_name}' mismatch: {actual_value} != {expected_value}"
+                actual_value, expected_value, f"Field '{field_name}' mismatch: {actual_value} != {expected_value}"
             )
 
-    def model_to_dict(self, instance, exclude: set[str | None] = None,
-                     api: bool = False) -> dict[str, Any]:
+    def model_to_dict(self, instance, exclude: set[str | None] = None, api: bool = False) -> dict[str, Any]:
         """
         Convert a model instance to a dictionary for comparison.
 
@@ -250,7 +237,7 @@ class PluginAPITestCase(PluginModelTestCase):
         super().setUp()
         self.token = Token.objects.create(user=self.user)
         self.client = APIClient()
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {TOKEN_PREFIX}{self.token.key}.{self.token.token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {TOKEN_PREFIX}{self.token.key}.{self.token.token}")
 
     def _get_list_url(self) -> str:
         """
@@ -261,7 +248,7 @@ class PluginAPITestCase(PluginModelTestCase):
         Returns:
             URL string for the list endpoint
         """
-        if hasattr(self, 'list_url_name'):
+        if hasattr(self, "list_url_name"):
             return reverse(self.list_url_name)
         raise NotImplementedError("Set self.list_url_name or override _get_list_url()")
 
@@ -277,19 +264,17 @@ class PluginAPITestCase(PluginModelTestCase):
         Returns:
             URL string for the detail endpoint
         """
-        if hasattr(self, 'detail_url_name'):
-            return reverse(self.detail_url_name, kwargs={'pk': instance.pk})
+        if hasattr(self, "detail_url_name"):
+            return reverse(self.detail_url_name, kwargs={"pk": instance.pk})
         raise NotImplementedError("Set self.detail_url_name or override _get_detail_url()")
 
     def assertHttpStatus(self, response, expected_status: int, msg: str = None):
         """Enhanced HTTP status for API responses with JSON data."""
         if response.status_code != expected_status:
-            error_msg = (
-                f"Expected HTTP {expected_status}, got {response.status_code}"
-            )
+            error_msg = f"Expected HTTP {expected_status}, got {response.status_code}"
 
             # Add JSON response data
-            if hasattr(response, 'data'):
+            if hasattr(response, "data"):
                 error_msg += f"\nResponse data: {response.data}"
 
             if msg:
@@ -317,7 +302,7 @@ class PluginViewTestCase(PluginModelTestCase):
         Returns:
             Base URL string (e.g., "plugins:netbox_pdu_plugin:pdu")
         """
-        if hasattr(self, 'base_url'):
+        if hasattr(self, "base_url"):
             return self.base_url
         raise NotImplementedError("Set self.base_url or override _get_base_url()")
 
@@ -334,12 +319,12 @@ class PluginViewTestCase(PluginModelTestCase):
         """
         base_url = self._get_base_url()
 
-        if action in ('add', 'list'):
+        if action in ("add", "list"):
             return reverse(f"{base_url}_{action}")
-        elif action in ('edit', 'delete') and instance:
-            return reverse(f"{base_url}_{action}", kwargs={'pk': instance.pk})
+        elif action in ("edit", "delete") and instance:
+            return reverse(f"{base_url}_{action}", kwargs={"pk": instance.pk})
         elif instance:
-            return reverse(base_url, kwargs={'pk': instance.pk})
+            return reverse(base_url, kwargs={"pk": instance.pk})
         else:
             raise ValueError(f"Invalid action '{action}' or missing instance")
 
@@ -359,15 +344,12 @@ class PluginViewTestCase(PluginModelTestCase):
 
         for key, value in data.items():
             # Handle model instances (foreign keys)
-            if hasattr(value, 'pk'):
+            if hasattr(value, "pk"):
                 post_data[key] = value.pk
 
             # Handle lists (many-to-many)
             elif isinstance(value, list | tuple):
-                post_data[key] = [
-                    obj.pk if hasattr(obj, 'pk') else obj
-                    for obj in value
-                ]
+                post_data[key] = [obj.pk if hasattr(obj, "pk") else obj for obj in value]
 
             # Handle regular values
             else:
@@ -396,16 +378,12 @@ class PluginGraphQLTestCase(PluginTestCase):
         Returns:
             Dict with GraphQL response data
         """
-        url = reverse('graphql')
-        data = {'query': query}
+        url = reverse("graphql")
+        data = {"query": query}
         if variables:
-            data['variables'] = variables
+            data["variables"] = variables
 
-        response = self.client.post(
-            url,
-            data=data,
-            content_type='application/json'
-        )
+        response = self.client.post(url, data=data, content_type="application/json")
 
         self.assertEqual(response.status_code, 200)
         return response.json()
@@ -413,8 +391,7 @@ class PluginGraphQLTestCase(PluginTestCase):
     def assertGraphQLSuccess(self, response):
         """Assert that GraphQL query succeeded without errors."""
         json_data = response.json()
-        self.assertNotIn('errors', json_data,
-                        f"GraphQL query failed: {json_data.get('errors')}")
+        self.assertNotIn("errors", json_data, f"GraphQL query failed: {json_data.get('errors')}")
 
     def assertGraphQLHasData(self, response, expected_count: int | None = None):
         """
@@ -426,20 +403,19 @@ class PluginGraphQLTestCase(PluginTestCase):
         """
         self.assertGraphQLSuccess(response)
         json_data = response.json()
-        self.assertIn('data', json_data)
+        self.assertIn("data", json_data)
 
         if expected_count is not None:
             # Assuming the query returns a list
-            data_key = list(json_data['data'].keys())[0]
-            actual_count = len(json_data['data'][data_key])
-            self.assertEqual(actual_count, expected_count,
-                           f"Expected {expected_count} results, got {actual_count}")
+            data_key = list(json_data["data"].keys())[0]
+            actual_count = len(json_data["data"][data_key])
+            self.assertEqual(actual_count, expected_count, f"Expected {expected_count} results, got {actual_count}")
 
 
 __all__ = [
-    'PluginTestCase',
-    'PluginModelTestCase',
-    'PluginAPITestCase',
-    'PluginViewTestCase',
-    'PluginGraphQLTestCase',
+    "PluginTestCase",
+    "PluginModelTestCase",
+    "PluginAPITestCase",
+    "PluginViewTestCase",
+    "PluginGraphQLTestCase",
 ]

@@ -11,12 +11,12 @@ from .models import ManagedPDU, PDUInlet, PDUOutlet
 class ManagedPDUFilterSet(NetBoxModelFilterSet):
     sync_status = django_filters.MultipleChoiceFilter(
         choices=SyncStatusChoices,
-        label=_('Sync Status'),
+        label=_("Sync Status"),
     )
 
     class Meta:
         model = ManagedPDU
-        fields = ('id', 'device', 'sync_status')
+        fields = ("id", "device", "sync_status")
 
     def search(self, queryset, name, value):
         return queryset.filter(device__name__icontains=value)
@@ -25,18 +25,18 @@ class ManagedPDUFilterSet(NetBoxModelFilterSet):
 @register_filterset
 class PDUOutletFilterSet(NetBoxModelFilterSet):
     managed_pdu_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='managed_pdu',
+        field_name="managed_pdu",
         queryset=ManagedPDU.objects.all(),
-        label=_('Managed PDU (ID)'),
+        label=_("Managed PDU (ID)"),
     )
     status = django_filters.MultipleChoiceFilter(
         choices=OutletStatusChoices,
-        label=_('Status'),
+        label=_("Status"),
     )
 
     class Meta:
         model = PDUOutlet
-        fields = ('id', 'managed_pdu', 'outlet_number', 'status', 'connected_device')
+        fields = ("id", "managed_pdu", "outlet_number", "status", "connected_device")
 
     def search(self, queryset, name, value):
         return queryset.filter(outlet_name__icontains=value)
@@ -45,14 +45,14 @@ class PDUOutletFilterSet(NetBoxModelFilterSet):
 @register_filterset
 class PDUInletFilterSet(NetBoxModelFilterSet):
     managed_pdu_id = django_filters.ModelMultipleChoiceFilter(
-        field_name='managed_pdu',
+        field_name="managed_pdu",
         queryset=ManagedPDU.objects.all(),
-        label=_('Managed PDU (ID)'),
+        label=_("Managed PDU (ID)"),
     )
 
     class Meta:
         model = PDUInlet
-        fields = ('id', 'managed_pdu', 'inlet_number')
+        fields = ("id", "managed_pdu", "inlet_number")
 
     def search(self, queryset, name, value):
         return queryset.filter(inlet_name__icontains=value)
