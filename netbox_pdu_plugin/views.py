@@ -83,7 +83,7 @@ class ManagedPDUDeleteView(generic.ObjectDeleteView):
 @register_model_view(models.ManagedPDU, name='sync')
 class ManagedPDUSyncView(View):
     """
-    View that calls the Raritan JSON-RPC API to synchronize outlet and inlet data.
+    View that synchronizes outlet, inlet, and hardware info from the PDU.
     Accepts POST requests only.
     """
 
@@ -226,7 +226,7 @@ class ManagedPDUSyncView(View):
 
         except PDUClientError as e:
             managed_pdu.sync_status = SyncStatusChoices.FAILED
-            managed_pdu.save()
+            managed_pdu.save(update_fields=['sync_status'])
             messages.error(request, f'PDU sync error: {e}')
             logger.error('PDU sync failed [%s]: %s', managed_pdu, e)
 
@@ -399,8 +399,10 @@ class PDUOutletPushNameView(View):
             return redirect(request.META.get('HTTP_REFERER') or outlet.get_absolute_url())
 
         client = get_pdu_client(outlet.managed_pdu)
+        push_succeeded = False
         try:
             client.set_outlet_name(outlet.outlet_number - 1, outlet.outlet_name)
+            push_succeeded = True
             messages.success(
                 request,
                 f'Outlet {outlet.outlet_number}: name "{outlet.outlet_name}" pushed to PDU.',
@@ -410,14 +412,15 @@ class PDUOutletPushNameView(View):
             messages.error(request, f'Failed to push name: {e}')
             logger.error('Push name failed [%s]: %s', outlet, e)
 
-        # Update the label of the matching NetBox PowerOutlet (matched by outlet number in name)
-        for po in PowerOutlet.objects.filter(device=outlet.managed_pdu.device):
-            m = re.search(r'\d+', po.name)
-            if m and int(m.group()) == outlet.outlet_number:
-                po.label = outlet.outlet_name
-                po.save(update_fields=['label'])
-                messages.info(request, f'PowerOutlet "{po.name}" label updated to "{outlet.outlet_name}".')
-                break
+        # Update the label of the matching NetBox PowerOutlet only when the PDU push succeeded
+        if push_succeeded:
+            for po in PowerOutlet.objects.filter(device=outlet.managed_pdu.device):
+                m = re.search(r'\d+', po.name)
+                if m and int(m.group()) == outlet.outlet_number:
+                    po.label = outlet.outlet_name
+                    po.save(update_fields=['label'])
+                    messages.info(request, f'PowerOutlet "{po.name}" label updated to "{outlet.outlet_name}".')
+                    break
 
         return redirect(request.META.get('HTTP_REFERER') or outlet.get_absolute_url())
 
@@ -464,6 +467,7 @@ class PDUInletSyncView(View):
         return redirect(request.META.get('HTTP_REFERER') or inlet.get_absolute_url())
 
 
+@register_model_view(models.PDUInlet, name='push_name')
 class PDUInletPushNameView(View):
     """Push inlet_name from NetBox to the PDU."""
 
@@ -479,8 +483,10 @@ class PDUInletPushNameView(View):
             return redirect(request.META.get('HTTP_REFERER') or inlet.get_absolute_url())
 
         client = get_pdu_client(inlet.managed_pdu)
+        push_succeeded = False
         try:
             client.set_inlet_name(inlet.inlet_number - 1, inlet.inlet_name)
+            push_succeeded = True
             messages.success(
                 request,
                 f'Inlet {inlet.inlet_number}: name "{inlet.inlet_name}" pushed to PDU.',
@@ -488,14 +494,15 @@ class PDUInletPushNameView(View):
         except PDUClientError as e:
             messages.error(request, f'Failed to push inlet name: {e}')
 
-        # Update the label of the matching NetBox PowerPort (matched by inlet number in name)
-        for pp in PowerPort.objects.filter(device=inlet.managed_pdu.device):
-            m = re.search(r'\d+', pp.name)
-            if m and int(m.group()) == inlet.inlet_number:
-                pp.label = inlet.inlet_name
-                pp.save(update_fields=['label'])
-                messages.info(request, f'PowerPort "{pp.name}" label updated to "{inlet.inlet_name}".')
-                break
+        # Update the label of the matching NetBox PowerPort only when the PDU push succeeded
+        if push_succeeded:
+            for pp in PowerPort.objects.filter(device=inlet.managed_pdu.device):
+                m = re.search(r'\d+', pp.name)
+                if m and int(m.group()) == inlet.inlet_number:
+                    pp.label = inlet.inlet_name
+                    pp.save(update_fields=['label'])
+                    messages.info(request, f'PowerPort "{pp.name}" label updated to "{inlet.inlet_name}".')
+                    break
 
         return redirect(request.META.get('HTTP_REFERER') or inlet.get_absolute_url())
 
@@ -526,7 +533,3 @@ class PDUInletListView(generic.ObjectListView):
     table = tables.PDUInletTable
     filterset = filtersets.PDUInletFilterSet
     filterset_form = forms.PDUInletFilterForm
-
-
-
-

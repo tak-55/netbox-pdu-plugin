@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from django.urls import reverse
 
+from ..backends.base import PDUClientError
 from ..choices import OutletStatusChoices, VendorChoices
 from ..models import ManagedPDU, PDUInlet, PDUOutlet
 from ..testing import PluginViewTestCase
@@ -263,6 +264,25 @@ class PDUOutletPushNameViewTest(PluginViewTestCase):
         self.assertHttpStatus(response, 302)
         mock_client.set_outlet_name.assert_called_once_with(0, 'Test Server')
 
+    @patch('netbox_pdu_plugin.views.get_pdu_client')
+    def test_push_name_pdu_error_does_not_update_netbox_label(self, mock_get_client):
+        self.add_permissions('netbox_pdu_plugin.change_managedpdu')
+        mock_client = MagicMock()
+        mock_client.set_outlet_name.side_effect = PDUClientError('connection refused')
+        mock_get_client.return_value = mock_client
+
+        from dcim.models import PowerOutlet as NbPowerOutlet
+        po = NbPowerOutlet.objects.create(
+            device=self.pdu.device,
+            name='Outlet 1',
+            label='old label',
+        )
+
+        self.client.post(self._url())
+
+        po.refresh_from_db()
+        self.assertEqual(po.label, 'old label')
+
 
 class PDUInletPushNameViewTest(PluginViewTestCase):
     """Tests for PDUInletPushNameView."""
@@ -298,3 +318,22 @@ class PDUInletPushNameViewTest(PluginViewTestCase):
 
         self.assertHttpStatus(response, 302)
         mock_client.set_inlet_name.assert_called_once_with(0, 'Main Input')
+
+    @patch('netbox_pdu_plugin.views.get_pdu_client')
+    def test_push_name_pdu_error_does_not_update_netbox_label(self, mock_get_client):
+        self.add_permissions('netbox_pdu_plugin.change_managedpdu')
+        mock_client = MagicMock()
+        mock_client.set_inlet_name.side_effect = PDUClientError('connection refused')
+        mock_get_client.return_value = mock_client
+
+        from dcim.models import PowerPort as NbPowerPort
+        pp = NbPowerPort.objects.create(
+            device=self.pdu.device,
+            name='Power Port 1',
+            label='old label',
+        )
+
+        self.client.post(self._url())
+
+        pp.refresh_from_db()
+        self.assertEqual(pp.label, 'old label')

@@ -433,10 +433,9 @@ class RaritanPDUClient(BasePDUClient):
                 t = self._rpc(sensor_rid, 'getThresholds') or {}
             except PDUClientError:
                 continue
-            if not any([
-                t.get('upperCriticalActive'), t.get('upperWarningActive'),
-                t.get('lowerWarningActive'), t.get('lowerCriticalActive'),
-            ]):
+            if not any(
+                t.get(k) for k in ('upperCriticalActive', 'upperWarningActive', 'lowerWarningActive', 'lowerCriticalActive')
+            ):
                 continue
             thresholds.append({
                 'label': label,
