@@ -46,7 +46,10 @@ class ManagedPDUView(generic.ObjectView):
         outlets_table = tables.PDUOutletTable(outlets)
         outlets_table.columns.hide("managed_pdu")
         outlets_table.configure(request)
-        outlets_table.columns.show("pk")  # Always show checkbox for bulk actions
+        if request.user.has_perm("netbox_pdu_plugin.change_managedpdu"):
+            outlets_table.columns.show("pk")  # Show checkbox for bulk actions
+        else:
+            outlets_table.columns.hide("pk")
 
         inlets = instance.inlets.restrict(request.user, "view").order_by("inlet_number")
         inlets_table = tables.PDUInletTable(inlets)
