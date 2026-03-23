@@ -97,11 +97,17 @@
           </tr>
         </table>
         {% if perms.netbox_pdu_plugin.change_managedpdu %}
-          <div class="card-footer">
+          <div class="card-footer d-flex gap-2">
             <form method="post" action="{% url 'plugins:netbox_pdu_plugin:managedpdu_sync' pk=object.pk %}">
               {% csrf_token %}
               <button type="submit" class="btn btn-primary btn-sm">
                 <i class="mdi mdi-refresh"></i> Sync PDU
+              </button>
+            </form>
+            <form method="post" action="{% url 'plugins:netbox_pdu_plugin:managedpdu_get_metrics' pk=object.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-primary btn-sm">
+                <i class="mdi mdi-chart-line"></i> Get Metrics
               </button>
             </form>
           </div>
