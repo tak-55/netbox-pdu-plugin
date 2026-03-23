@@ -96,6 +96,7 @@ INLET_SYNC_BUTTON = """
 
 
 class PDUOutletTable(NetBoxTable):
+    pk = columns.ToggleColumn()
     actions = columns.ActionsColumn(actions=("edit",), extra_buttons=OUTLET_SYNC_BUTTON)
     outlet_number = tables.Column(linkify=True, verbose_name="Outlet")
     outlet_name = tables.Column(verbose_name="Name")
