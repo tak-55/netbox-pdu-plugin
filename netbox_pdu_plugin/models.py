@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from netbox.models import NetBoxModel
 
-from .choices import OutletStatusChoices, SyncStatusChoices, VendorChoices
+from .choices import LinePairChoices, OutletStatusChoices, SyncStatusChoices, VendorChoices
 
 
 class ManagedPDU(NetBoxModel):
@@ -319,6 +319,44 @@ class PDUInlet(NetBoxModel):
         verbose_name=_("Energy Reset At"),
         help_text=_("Timestamp when the energy accumulation was last reset"),
     )
+    # 3-phase: per-pole current readings (available via Prometheus only)
+    poleline_l1_current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("L1 Current (A)"),
+        help_text=_("Per-phase current for L1 (3-phase PDUs only)"),
+    )
+    poleline_l2_current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("L2 Current (A)"),
+        help_text=_("Per-phase current for L2 (3-phase PDUs only)"),
+    )
+    poleline_l3_current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("L3 Current (A)"),
+        help_text=_("Per-phase current for L3 (3-phase PDUs only)"),
+    )
+    # 3-phase: current and voltage unbalance metrics
+    unbalanced_current_pct = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Current Unbalance (%)"),
+        help_text=_("Phase current unbalance percentage (3-phase PDUs only)"),
+    )
+    unbalanced_ll_current_pct = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("L-L Current Unbalance (%)"),
+        help_text=_("Line-to-line current unbalance percentage (3-phase PDUs only)"),
+    )
+    unbalanced_ll_voltage_pct = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("L-L Voltage Unbalance (%)"),
+        help_text=_("Line-to-line voltage unbalance percentage (3-phase PDUs only)"),
+    )
     last_updated_from_pdu = models.DateTimeField(
         null=True,
         blank=True,
@@ -341,6 +379,141 @@ class PDUInlet(NetBoxModel):
 
     def get_absolute_url(self):
         return reverse("plugins:netbox_pdu_plugin:pduinlet", args=[self.pk])
+
+
+class PDUInletLinePair(models.Model):
+    """
+    Line-pair power data for a 3-phase PDU inlet.
+    One row per inlet × line-pair combination (L1-L2, L2-L3, L3-L1).
+    Replaced entirely on each PDU sync.
+    """
+
+    managed_pdu = models.ForeignKey(
+        to=ManagedPDU,
+        on_delete=models.CASCADE,
+        related_name="inlet_linepairs",
+        verbose_name=_("Managed PDU"),
+    )
+    inlet_number = models.PositiveIntegerField(
+        default=1,
+        verbose_name=_("Inlet Number"),
+    )
+    line_pair = models.CharField(
+        max_length=4,
+        choices=LinePairChoices,
+        verbose_name=_("Line Pair"),
+    )
+    voltage_v = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Voltage (V)"),
+    )
+    current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Current (A)"),
+    )
+    power_w = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Active Power (W)"),
+    )
+    apparent_power_va = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Apparent Power (VA)"),
+    )
+    power_factor = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Power Factor"),
+    )
+    energy_wh = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Accumulated Energy (Wh)"),
+    )
+    last_updated_from_pdu = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Last Updated from PDU"),
+    )
+
+    class Meta:
+        ordering = ("managed_pdu", "inlet_number", "line_pair")
+        unique_together = ("managed_pdu", "inlet_number", "line_pair")
+        verbose_name = _("PDU Inlet Line Pair")
+        verbose_name_plural = _("PDU Inlet Line Pairs")
+
+    def __str__(self):
+        return f"{self.managed_pdu} - Inlet {self.inlet_number} {self.line_pair}"
+
+
+class PDUOverCurrentProtector(models.Model):
+    """
+    Over-current protector (circuit breaker) data for a PDU.
+    One row per OCP (e.g. C1, C2, C3 on 3-phase PDUs).
+    Updated in-place on each sync / metrics fetch.
+    """
+
+    managed_pdu = models.ForeignKey(
+        to=ManagedPDU,
+        on_delete=models.CASCADE,
+        related_name="ocps",
+        verbose_name=_("Managed PDU"),
+    )
+    ocp_id = models.CharField(
+        max_length=10,
+        verbose_name=_("OCP ID"),
+        help_text=_("OCP identifier as reported by PDU (e.g. C1, C2, C3)"),
+    )
+    rating_current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Rating (A)"),
+        help_text=_("Rated current capacity of the breaker"),
+    )
+    current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("Current (A)"),
+        help_text=_("Total measured current"),
+    )
+    poleline_l1_current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("L1 Current (A)"),
+    )
+    poleline_l2_current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("L2 Current (A)"),
+    )
+    poleline_l3_current_a = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name=_("L3 Current (A)"),
+    )
+    tripped = models.BooleanField(
+        null=True,
+        blank=True,
+        verbose_name=_("Tripped"),
+        help_text=_("True if the breaker has tripped (circuit open)"),
+    )
+    last_updated_from_pdu = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Last Updated from PDU"),
+    )
+
+    class Meta:
+        ordering = ("managed_pdu", "ocp_id")
+        unique_together = ("managed_pdu", "ocp_id")
+        verbose_name = _("PDU Over-Current Protector")
+        verbose_name_plural = _("PDU Over-Current Protectors")
+
+    def __str__(self):
+        return f"{self.managed_pdu} - OCP {self.ocp_id}"
 
 
 class PDUNetworkInterface(models.Model):
