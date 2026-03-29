@@ -13,6 +13,7 @@ authors = [
 ]
 description = "NetBox plugin for Managed PDUs."
 readme = "README.md"
+license = {file = "LICENSE"}
 license-files = ["LICENSE"]
 keywords = ["netbox", "netbox-plugin"]
 
@@ -23,6 +24,7 @@ classifiers=[
     'Intended Audience :: Developers',
     'Intended Audience :: System Administrators',
     'Intended Audience :: Telecommunications Industry',
+    'License :: OSI Approved :: Apache Software License',
     'Natural Language :: English',
     'Programming Language :: Python :: 3 :: Only',
     'Programming Language :: Python :: 3.12',

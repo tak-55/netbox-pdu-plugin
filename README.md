@@ -239,6 +239,12 @@ uvx pre-commit install --hook-type pre-push
 4. Generate and apply a migration
 
 ---
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
+See [NOTICE](NOTICE) for attribution details.
+
 ---
 
 # NetBox PDU プラグイン
@@ -473,3 +479,10 @@ uvx pre-commit install --hook-type pre-push
 2. `netbox_pdu_plugin/backends/__init__.py` の `_VENDOR_BACKENDS` に登録
 3. `netbox_pdu_plugin/choices.py` の `VendorChoices` に追加
 4. マイグレーションを生成・適用
+
+---
+
+## ライセンス
+
+このプロジェクトは [Apache License 2.0](LICENSE) のもとで公開しています。  
+帰属表示の詳細は [NOTICE](NOTICE) を参照してください。
