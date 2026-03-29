@@ -301,6 +301,23 @@ class RaritanPDUClient(BasePDUClient):
             raise PDUClientError(f"HTTP error {response.status_code}: {e}") from e
         return self._parse_prometheus_text(response.text)
 
+    def _get_pdu_name_from_metrics(self) -> str:
+        """Extract pduname label from the first Prometheus metric line."""
+        url = f"{self.base_url}/cgi-bin/dump_prometheus.cgi?include_names=1"
+        label_re = re.compile(r'pduname="([^"]*)"')
+        try:
+            response = self.session.get(url, verify=self.verify_ssl, timeout=10)
+            response.raise_for_status()
+            for line in response.text.splitlines():
+                if line.startswith("#") or not line.strip():
+                    continue
+                m = label_re.search(line)
+                if m:
+                    return m.group(1)
+        except Exception:
+            pass
+        return ""
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -539,10 +556,17 @@ class RaritanPDUClient(BasePDUClient):
         except PDUClientError as e:
             logger.warning("Failed to fetch datetime config: %s", e)
 
+        pdu_name = ""
+        try:
+            pdu_name = self._get_pdu_name_from_metrics()
+        except PDUClientError:
+            pass
+
         return {
             "model": nameplate.get("model", ""),
             "serial_number": nameplate.get("serialNumber", ""),
             "firmware_version": meta.get("fwRevision", ""),
+            "pdu_name": pdu_name,
             "rated_voltage": rating.get("voltage", ""),
             "rated_current": rating.get("current", ""),
             "rated_frequency": rating.get("frequency", ""),

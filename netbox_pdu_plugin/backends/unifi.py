@@ -225,6 +225,7 @@ class UniFiPDUClient(BasePDUClient):
             "model": device.get("model", ""),
             "serial_number": device.get("serial", ""),
             "firmware_version": device.get("version", ""),
+            "pdu_name": device.get("name", ""),
             "hw_revision": "",
             "pdu_mac_address": mac,
             "rated_voltage": "",

@@ -42,6 +42,7 @@ class BasePDUClient(ABC):
             model            (str) - PDU model name
             serial_number    (str) - Serial number
             firmware_version (str) - Firmware version string
+            pdu_name         (str) - Device name configured on the PDU hardware (may be empty)
             network_interfaces (list[dict]) - each dict:
                 name        (str) - interface name (e.g. 'ETH1')
                 mac_address (str) - MAC address

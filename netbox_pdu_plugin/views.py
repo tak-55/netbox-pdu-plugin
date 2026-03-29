@@ -1,11 +1,10 @@
 import logging
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import django_rq
 from dcim.models import PowerOutlet, PowerPort
 from django.contrib import messages
-from django.db import transaction
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -15,22 +14,13 @@ from netbox.views import generic
 from utilities.views import register_model_view
 
 from . import filtersets, forms, jobs, models, tables
-from .jobs import fetch_pdu_metrics
 from .backends import get_pdu_client
 from .backends.base import PDUClientError
 from .choices import OutletStatusChoices, SyncStatusChoices
+from .jobs import epoch_to_dt, fetch_pdu_metrics, sync_managed_pdu
 
 logger = logging.getLogger(__name__)
 
-
-def _epoch_to_dt(epoch):
-    """Convert epoch seconds to an aware datetime, or None."""
-    if epoch is None:
-        return None
-    try:
-        return datetime.fromtimestamp(float(epoch), tz=UTC)
-    except (ValueError, OSError):
-        return None
 
 
 #
@@ -102,126 +92,8 @@ class ManagedPDUSyncView(View):
             messages.error(request, _("You do not have permission to sync this PDU."))
             return redirect(managed_pdu.get_absolute_url())
 
-        client = get_pdu_client(managed_pdu)
-
         try:
-            with transaction.atomic():
-                now = timezone.now()
-
-                # Sync PDU hardware info
-                pdu_info = client.get_pdu_info()
-                managed_pdu.pdu_model = pdu_info.get("model", "")
-                managed_pdu.serial_number = pdu_info.get("serial_number", "")
-                managed_pdu.firmware_version = pdu_info.get("firmware_version", "")
-                managed_pdu.rated_voltage = pdu_info.get("rated_voltage", "")
-                managed_pdu.rated_current = pdu_info.get("rated_current", "")
-                managed_pdu.rated_frequency = pdu_info.get("rated_frequency", "")
-                managed_pdu.rated_power = pdu_info.get("rated_power", "")
-                managed_pdu.hw_revision = pdu_info.get("hw_revision", "")
-                managed_pdu.pdu_mac_address = pdu_info.get("pdu_mac_address", "")
-                managed_pdu.dns_servers = pdu_info.get("dns_servers", "")
-                managed_pdu.default_gateway = pdu_info.get("default_gateway", "")
-                managed_pdu.device_time = _epoch_to_dt(pdu_info.get("device_time_epoch"))
-                managed_pdu.ntp_servers = pdu_info.get("ntp_servers", "")
-
-                # Sync serial number to Device
-                serial = pdu_info.get("serial_number", "")
-                if serial and managed_pdu.device.serial != serial:
-                    managed_pdu.device.serial = serial
-                    managed_pdu.device.save(update_fields=["serial"])
-                    logger.info("Updated Device serial [%s]: %s", managed_pdu.device, serial)
-
-                models.PDUNetworkInterface.objects.filter(managed_pdu=managed_pdu).delete()
-                for iface in pdu_info.get("network_interfaces", []):
-                    models.PDUNetworkInterface.objects.create(
-                        managed_pdu=managed_pdu,
-                        interface_name=iface.get("name", ""),
-                        mac_address=iface.get("mac_address", ""),
-                        ip_address=iface.get("ip_address", ""),
-                        config_method=iface.get("config_method", ""),
-                        link_speed=iface.get("link_speed", ""),
-                    )
-
-                # Sync outlets
-                outlet_data_list = client.get_all_outlet_data()
-                outlet_created = 0
-                outlet_updated = 0
-
-                for outlet_data in outlet_data_list:
-                    outlet_number = outlet_data["outlet_number"]
-                    switching_state = outlet_data.get("switchingState", "unknown").lower()
-                    if switching_state == "on":
-                        status = OutletStatusChoices.ON
-                    elif switching_state == "off":
-                        status = OutletStatusChoices.OFF
-                    else:
-                        status = OutletStatusChoices.UNKNOWN
-
-                    obj, created = models.PDUOutlet.objects.update_or_create(
-                        managed_pdu=managed_pdu,
-                        outlet_number=outlet_number,
-                        defaults={
-                            "outlet_name": outlet_data.get("name") or outlet_data.get("label", ""),
-                            "status": status,
-                            "current_a": outlet_data.get("current_a"),
-                            "power_w": outlet_data.get("power_w"),
-                            "voltage_v": outlet_data.get("voltage_v"),
-                            "power_factor": outlet_data.get("power_factor"),
-                            "energy_wh": outlet_data.get("energy_wh"),
-                            "energy_reset_at": _epoch_to_dt(outlet_data.get("energy_reset_epoch")),
-                            "last_updated_from_pdu": now,
-                        },
-                    )
-                    if created:
-                        outlet_created += 1
-                    else:
-                        outlet_updated += 1
-
-                # Sync connected_device from NetBox PowerOutlet cable connections
-                nb_outlets = PowerOutlet.objects.filter(device=managed_pdu.device)
-                for nb_outlet in nb_outlets:
-                    m = re.search(r"\d+", nb_outlet.name)
-                    if not m:
-                        continue
-                    outlet_num = int(m.group())
-                    peers = nb_outlet.link_peers
-                    connected = peers[0].device if peers else None
-                    models.PDUOutlet.objects.filter(
-                        managed_pdu=managed_pdu,
-                        outlet_number=outlet_num,
-                    ).update(connected_device=connected)
-
-                # Sync inlets
-                inlet_data_list = client.get_all_inlet_data()
-                inlet_created = 0
-                inlet_updated = 0
-
-                for inlet_data in inlet_data_list:
-                    obj, created = models.PDUInlet.objects.update_or_create(
-                        managed_pdu=managed_pdu,
-                        inlet_number=inlet_data["inlet_number"],
-                        defaults={
-                            "inlet_name": inlet_data.get("name", ""),
-                            "current_a": inlet_data.get("current_a"),
-                            "power_w": inlet_data.get("power_w"),
-                            "apparent_power_va": inlet_data.get("apparent_power_va"),
-                            "voltage_v": inlet_data.get("voltage_v"),
-                            "power_factor": inlet_data.get("power_factor"),
-                            "frequency_hz": inlet_data.get("frequency_hz"),
-                            "energy_wh": inlet_data.get("energy_wh"),
-                            "energy_reset_at": _epoch_to_dt(inlet_data.get("energy_reset_epoch")),
-                            "last_updated_from_pdu": now,
-                        },
-                    )
-                    if created:
-                        inlet_created += 1
-                    else:
-                        inlet_updated += 1
-
-                managed_pdu.last_synced = now
-                managed_pdu.sync_status = SyncStatusChoices.SUCCESS
-                managed_pdu.save()
-
+            outlet_created, outlet_updated, inlet_created, inlet_updated = sync_managed_pdu(managed_pdu)
             messages.success(
                 request,
                 f"PDU sync complete: outlets {outlet_created} created, {outlet_updated} updated; "
@@ -236,7 +108,7 @@ class ManagedPDUSyncView(View):
                 inlet_updated,
             )
 
-        except PDUClientError as e:
+        except Exception as e:
             managed_pdu.sync_status = SyncStatusChoices.FAILED
             managed_pdu.save(update_fields=["sync_status"])
             messages.error(request, f"PDU sync error: {e}")
@@ -318,7 +190,7 @@ class PDUOutletSyncView(View):
             outlet.voltage_v = outlet_data.get("voltage_v")
             outlet.power_factor = outlet_data.get("power_factor")
             outlet.energy_wh = outlet_data.get("energy_wh")
-            outlet.energy_reset_at = _epoch_to_dt(outlet_data.get("energy_reset_epoch"))
+            outlet.energy_reset_at = epoch_to_dt(outlet_data.get("energy_reset_epoch"))
             outlet.last_updated_from_pdu = timezone.now()
             outlet.save()
 
@@ -554,7 +426,7 @@ class PDUInletSyncView(View):
             inlet.power_factor = inlet_data.get("power_factor")
             inlet.frequency_hz = inlet_data.get("frequency_hz")
             inlet.energy_wh = inlet_data.get("energy_wh")
-            inlet.energy_reset_at = _epoch_to_dt(inlet_data.get("energy_reset_epoch"))
+            inlet.energy_reset_at = epoch_to_dt(inlet_data.get("energy_reset_epoch"))
             inlet.last_updated_from_pdu = timezone.now()
             inlet.save()
 

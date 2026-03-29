@@ -13,6 +13,8 @@ class ManagedPDU(NetBoxModel):
     and holds the connection details for the PDU management API.
     """
 
+    clone_fields = ["vendor", "api_url", "api_username", "api_password", "verify_ssl", "sync_enabled", "metrics_enabled", "comments"]
+
     device = models.OneToOneField(
         to=Device,
         on_delete=models.CASCADE,
@@ -67,6 +69,16 @@ class ManagedPDU(NetBoxModel):
         choices=SyncStatusChoices,
         default=SyncStatusChoices.NEVER,
         verbose_name=_("Sync Status"),
+    )
+    sync_enabled = models.BooleanField(
+        default=True,
+        verbose_name=_("Sync Enabled"),
+        help_text=_("Include this PDU in periodic full sync jobs"),
+    )
+    metrics_enabled = models.BooleanField(
+        default=True,
+        verbose_name=_("Metrics Enabled"),
+        help_text=_("Include this PDU in periodic metrics polling jobs"),
     )
     pdu_model = models.CharField(
         max_length=100,
@@ -135,6 +147,12 @@ class ManagedPDU(NetBoxModel):
         blank=True,
         verbose_name=_("NTP Servers"),
         help_text=_("Comma-separated list of NTP server addresses"),
+    )
+    pdu_name = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name=_("PDU Name"),
+        help_text=_("Device name as configured on the PDU hardware"),
     )
     comments = models.TextField(
         blank=True,

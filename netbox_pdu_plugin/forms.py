@@ -1,4 +1,4 @@
-from dcim.models import Device
+from dcim.models import Device, DeviceRole
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from netbox.forms import NetBoxModelFilterSetForm, NetBoxModelForm
@@ -15,11 +15,25 @@ from .models import ManagedPDU, PDUInlet, PDUOutlet
 
 
 class ManagedPDUForm(NetBoxModelForm):
+    device_role = DynamicModelChoiceField(
+        queryset=DeviceRole.objects.all(),
+        required=False,
+        label=_("Device Role (filter)"),
+        help_text=_("Filter device list by role"),
+    )
     device = DynamicModelChoiceField(
         queryset=Device.objects.all(),
         help_text=_("Select the PDU device registered in NetBox"),
+        query_params={"role_id": "$device_role"},
     )
     comments = CommentField()
+
+    fieldsets = (
+        FieldSet("device_role", "device", name="Device"),
+        FieldSet("vendor", "api_url", "api_username", "api_password", "verify_ssl", name="Connection"),
+        FieldSet("sync_enabled", "metrics_enabled", name="Polling"),
+        FieldSet("comments", "tags", name="Other"),
+    )
 
     class Meta:
         model = ManagedPDU
@@ -30,6 +44,8 @@ class ManagedPDUForm(NetBoxModelForm):
             "api_username",
             "api_password",
             "verify_ssl",
+            "sync_enabled",
+            "metrics_enabled",
             "comments",
             "tags",
         )
@@ -57,11 +73,18 @@ class PDUOutletForm(NetBoxModelForm):
         queryset=ManagedPDU.objects.all(),
         label=_("Managed PDU"),
     )
+    device_role = DynamicModelChoiceField(
+        queryset=DeviceRole.objects.all(),
+        required=False,
+        label=_("Device Role (filter)"),
+        help_text=_("Filter connected device list by role"),
+    )
     connected_device = DynamicModelChoiceField(
         queryset=Device.objects.all(),
         required=False,
         label=_("Connected Device"),
         help_text=_("Device connected to this outlet"),
+        query_params={"role_id": "$device_role"},
     )
     comments = CommentField()
 
@@ -71,6 +94,7 @@ class PDUOutletForm(NetBoxModelForm):
             "managed_pdu",
             "outlet_number",
             "outlet_name",
+            "device_role",
             "connected_device",
             "comments",
             "tags",

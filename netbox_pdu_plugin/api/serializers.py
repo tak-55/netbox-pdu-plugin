@@ -9,6 +9,7 @@ class ManagedPDUSerializer(NetBoxModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="plugins-api:netbox_pdu_plugin-api:managedpdu-detail")
     device = DeviceSerializer(nested=True)
     outlet_count = serializers.IntegerField(read_only=True)
+    api_password = serializers.CharField(write_only=True)
 
     class Meta:
         model = ManagedPDU
@@ -17,9 +18,13 @@ class ManagedPDUSerializer(NetBoxModelSerializer):
             "url",
             "display",
             "device",
+            "vendor",
             "api_url",
             "api_username",
+            "api_password",
             "verify_ssl",
+            "sync_enabled",
+            "metrics_enabled",
             "sync_status",
             "last_synced",
             "outlet_count",
@@ -30,7 +35,7 @@ class ManagedPDUSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "device")
-        # api_password is excluded from serialization for security
+        # api_password is write-only — accepted on POST/PATCH but never returned in responses
 
 
 class PDUOutletSerializer(NetBoxModelSerializer):
